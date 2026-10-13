@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1b23a8"><link rel="manifest" href="manifest.json"><link rel="icon" href="assets/icon-192.png">
+<title>Supershores</title>
+<style>
+:root{--blue:#1b23a8;--orange:#ff6a0d;--green:#0b9a1f;--ink:#161a3a;--mute:#646a8a;--line:#dfe2f0;--bg:#f6f7fc;--bad:#c0281d}
+*{box-sizing:border-box}html{font-size:clamp(16px,.5vw + 12px,26px)}body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.4 "Segoe UI","Helvetica Neue",system-ui,sans-serif;padding-bottom:70px}
+button,input,select{font:inherit;color:inherit}input,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;background:#fff}
+button{border:0;border-radius:8px;padding:11px 16px;background:var(--blue);color:#fff;font-weight:600;cursor:pointer}
+button.alt{background:#fff;color:var(--blue);border:1px solid var(--blue)}button.go{background:var(--orange);font-size:1.12rem;width:100%;padding:15px}button:disabled{opacity:.5}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--blue);color:#fff;position:sticky;top:0;z-index:5}
+header img{width:34px;height:34px;border-radius:50%;background:#fff}header b{flex:1}header .chip{font-size:12.5px;background:#fff2;padding:3px 9px;border-radius:99px}
+header button{background:#fff2;padding:6px 10px}
+main{max-width:min(1400px,100%);margin:0 auto;padding:12px max(12px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left))}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;color:var(--mute);border-radius:0;padding:14px}nav button.on{color:var(--blue);box-shadow:inset 0 3px var(--orange)}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1;min-width:0}.mute{color:var(--mute);font-size:.875rem}.right{margin-left:auto;text-align:right}
+.item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;color:var(--ink);border:0;border-bottom:1px solid var(--line);border-radius:0;padding:11px 4px;font-weight:400}
+.low{color:var(--bad);font-weight:600}.qty{display:flex;align-items:center;gap:6px}.qty button{padding:4px 11px;background:#eef0fb;color:var(--blue)}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.seg button{background:#fff;color:var(--ink);border:1px solid var(--line)}.seg button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.tot div{display:flex;justify-content:space-between;padding:2px 0}.tot .big{font-size:1.4rem;font-weight:700}
+.tag{font-size:.78rem;font-weight:700;padding:2px 8px;border-radius:99px;background:#e8eafa;color:var(--blue)}.tag.ok{background:#dff3e3;color:var(--green)}.tag.bad{background:#fbdcd9;color:var(--bad)}
+.login{max-width:400px;margin:4vh auto;text-align:center;animation:rise .5s ease both}.login label{display:block;text-align:left;font-weight:600;margin:14px 0 4px}
+body:has(.login){min-height:100vh;background:radial-gradient(900px 520px at 8% -8%,#ffe2cf 0,transparent 60%),radial-gradient(800px 520px at 100% 0,#d6f2db 0,transparent 55%),linear-gradient(#f7f8fd,#eceefb)}
+.login>img{width:78%;max-width:300px;margin:0 auto 14px;display:block}
+.login .card{border:0;border-radius:18px;padding:22px 20px;box-shadow:0 18px 40px -18px #1b23a860,0 2px 6px #1b23a814;position:relative;overflow:hidden}
+.login .card::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,var(--blue) 0 34%,var(--orange) 34% 67%,var(--green) 67%)}
+.login h2{margin:8px 0 2px;font-size:1.35rem;color:var(--blue)}
+.login input{border-radius:10px;border:1.5px solid var(--line);padding:13px;font-size:1.05rem}.login input:focus{border-color:var(--orange);outline:none;box-shadow:0 0 0 3px #ff6a0d33}
+.login .link{background:none;border:0;color:var(--blue);text-decoration:underline;font-weight:500}.login .foot{margin-top:16px;font-size:.78rem;color:var(--mute)}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}}@media(prefers-reduced-motion:reduce){.login{animation:none}}
+dialog{border:0;border-radius:12px;padding:18px;max-width:420px;width:92%}dialog::backdrop{background:#0008}
+.toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;z-index:20;max-width:90%}.toast.err{background:var(--bad)}
+.rcpt{font-family:"Courier New",monospace;font-size:14px;max-width:340px;margin:0 auto}.rcpt img{width:70%;display:block;margin:0 auto 6px}.rcpt .c{text-align:center}.rcpt hr{border:0;border-top:1px dashed #000}.rcpt .l{display:flex;justify-content:space-between;gap:8px}
+@media print{body>*:not(#print){display:none!important}#print{display:block!important}}#print{display:none}
+button,input,select{min-height:44px}.split{display:grid;gap:12px}dialog{max-height:90vh;overflow:auto}nav button{font-size:.8rem;padding:10px 2px}
+@media(min-width:900px){body{padding:0 0 0 104px}nav{top:0;bottom:auto;right:auto;width:104px;flex-direction:column;justify-content:flex-start;padding-top:70px;border-top:0;border-right:1px solid var(--line)}
+nav button{padding:18px 4px;font-size:.95rem}nav button.on{box-shadow:inset 4px 0 var(--orange)}.split{grid-template-columns:1fr 1fr;align-items:start;gap:16px}.split>.card:last-child,.split>div:last-child{position:sticky;top:76px}.toast{bottom:24px}}
+@media(min-width:1600px){main{max-width:1700px}.split{gap:24px}}
+@media(max-height:480px) and (orientation:landscape){header{padding:4px 12px}nav button{padding:6px}body{padding-bottom:50px}}
+@media(max-width:340px){.seg{grid-template-columns:repeat(2,1fr)}}
+@media(pointer:fine){button:hover{filter:brightness(1.1)}}
+</style></head><body>
+<div id="app"></div><div id="print"></div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbyR4tyWCQ7OVLSfhe3UUr2vsZRzH_Ywf_5b8AYKhfytYYiy9BocFUBnbXbXKjdmeIjtfA/exec';           // set this to the client's Apps Script web app URL
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>(S.cfg.Currency||'₦')+Number(n).toLocaleString('en-NG');
+let S={user:null,token:null,cfg:{},items:[],debtors:[],cart:[],pay:'Cash',cust:'',disc:0,voucher:null,tab:'sell',q:'',pending:0,failed:0};
+
+/* ---------- Local storage: IndexedDB, no libraries ---------- */
+let db;const KEYS={items:'ItemID',debtors:'CustomerID',sales:'SaleID',saleItems:'SaleItemID',queue:'opId',expenses:'ExpenseID',cash:'OpID'};
+const open=()=>new Promise((ok,no)=>{const r=indexedDB.open('supershores',2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('kv'))d.createObjectStore('kv');for(const s in KEYS)if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:KEYS[s]});};r.onsuccess=()=>{db=r.result;ok();};r.onerror=()=>no(r.error);});
+const rq=r=>new Promise((ok,no)=>{r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});
+const st=(s,w)=>db.transaction(s,w?'readwrite':'readonly').objectStore(s);
+const get=(s,k)=>rq(st(s).get(k)),all=s=>rq(st(s).getAll()),put=(s,v)=>rq(st(s,1).put(v)),del=(s,k)=>rq(st(s,1).delete(k));
+const kget=k=>rq(st('kv').get(k)),kset=(k,v)=>rq(st('kv',1).put(v,k));
+async function bulk(s,rows,clear){const t=db.transaction(s,'readwrite'),o=t.objectStore(s);if(clear)o.clear();rows.forEach(r=>o.put(r));return new Promise(ok=>t.oncomplete=ok);}
+
+/* ---------- Server calls ---------- */
+async function api(action,body={}){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...body})});
+ const j=await r.json();if(!j.ok){const e=new Error(j.error);e.code=j.code;throw e;}return j.data;}
+function toast(m,bad){const t=document.createElement('div');t.className='toast'+(bad?' err':'');t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),3500);}
+function ask(title,fields,okLabel='OK'){return new Promise(res=>{const d=document.createElement('dialog');
+ d.innerHTML=`<form method="dialog"><h3 style="margin-top:0">${title}</h3>${fields.map(f=>`<label class="mute">${f[1]}</label><input name="${f[0]}" type="${f[2]||'text'}" value="${esc(f[3]??'')}" inputmode="${f[2]==='password'?'numeric':'text'}" autocomplete="off">`).join('')}<div class="row" style="margin-top:14px"><button class="alt" value="x">Cancel</button><button class="grow" value="ok">${okLabel}</button></div></form>`;
+ document.body.append(d);d.showModal();d.onclose=()=>{const ok=d.returnValue==='ok',v={};if(ok)fields.forEach(f=>v[f[0]]=d.querySelector(`[name=${f[0]}]`).value.trim());d.remove();res(ok?v:null);};});}
+const sha=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+
+/* ---------- Login (works offline after the first online sign-in) ---------- */
+function loginScreen(msg){const last=S.lastId||'';$('#app').innerHTML=`<div class="login"><img src="assets/logo.png" alt="Supershores. Save Time. Save Money. Be Safe.">
+ <div class="card" style="text-align:left"><h2>Welcome back</h2><p class="mute" style="margin:0">Sign in to continue</p><label for="id">Staff ID</label><input id="id" value="${esc(last)}" autocapitalize="characters" autocomplete="username">
+ <label for="pin">Passcode</label><input id="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password">
+ <p class="mute" id="msg" role="alert" style="color:var(--bad)">${esc(msg||'')}</p><button class="go" id="go">Sign in</button></div>
+ <p><button class="link" id="first">First time setup (owner)</button></p><p class="foot">Powered by CyberHayde</p></div>`;
+ $('#go').onclick=signIn;$('#pin').onkeydown=e=>{if(e.key==='Enter')signIn();};$('#first').onclick=firstRun;(last?$('#pin'):$('#id')).focus();}
+async function signIn(){const id=$('#id').value.trim().toUpperCase(),pin=$('#pin').value;if(!id||pin.length!==6)return loginScreen('Enter your ID and 6 digit passcode.');
+ const users=(await kget('users'))||{};
+ try{const d=await api('login',{staffId:id,pin});users[id]={user:d.user,token:d.token,ver:d.offlineVerifier};await kset('users',users);await start(d.user,d.token);}
+ catch(e){if(e.code){return loginScreen(e.code==='LICENSE_LOCKED'?'This subscription has expired. Ask the owner to renew.':e.message);}
+  const u=users[id];if(!u)return loginScreen('No connection. Sign in online once on this phone first.');
+  if(await sha(u.ver.salt+':'+pin)!==u.ver.hash)return loginScreen('Wrong ID or passcode.');await start(u.user,u.token);}}
+async function firstRun(){const v=await ask('Owner setup',[['code','Setup code'],['name','Your name'],['pin','Choose a 6 digit passcode','password']],'Create account');if(!v)return;
+ try{const d=await api('firstRun',{setupCode:v.code,name:v.name,pin:v.pin});const users=(await kget('users'))||{};users[d.user.id]={user:d.user,token:d.token,ver:d.offlineVerifier};await kset('users',users);await start(d.user,d.token);}catch(e){loginScreen(e.message);}}
+async function start(user,token){S.user=user;S.token=token;S.lastId=user.id;await kset('lastId',user.id);if(S.locked){lockScreen();return;}
+ if(!(await kget('dev'))&&navigator.onLine){try{const d=await api('registerDevice',{token,label:navigator.userAgent.slice(0,40)});await kset('dev',d.deviceCode);}catch(e){}}
+ await load();render();idleReset();remind();sync();}
+function logout(){S.user=S.token=null;S.cart=[];if(S.updatePending)return location.reload();loginScreen();}
+let idleT;function idleReset(){clearTimeout(idleT);if(!S.user)return;idleT=setTimeout(logout,(+S.cfg.LockTimeoutSeconds||60)*1000*5);}
+['click','keydown','touchstart'].forEach(e=>addEventListener(e,idleReset));
+
+/* ---------- Data + sync ---------- */
+async function load(){S.items=await all('items');S.debtors=await all('debtors');S.cfg=(await kget('cfg'))||{};S.pending=(await all('queue')).filter(o=>!o.failed).length;S.failed=(await all('queue')).filter(o=>o.failed).length;}
+async function enqueue(type,payload){const op={opId:'op-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),seq:Date.now(),type,payload,token:S.token,ts:new Date().toISOString(),offline:!navigator.onLine};await put('queue',op);return op;}
+function applyPending(items,q){const by={};items.forEach(i=>by[i.ItemID]=i);q.filter(o=>o.type==='sale.create'&&!o.failed).forEach(o=>o.payload.lines.forEach(l=>{const it=by[l.itemId];if(!it)return;
+ const comps=it.BundleJSON?JSON.parse(it.BundleJSON):null;(comps?comps.map(c=>[c.itemId,c.qty*l.qty]):[[it.ItemID,l.qty]]).forEach(([id,n])=>{if(by[id])by[id].CurrentStock-=n;});}));}
+let syncing=false;
+async function sync(){if(syncing||S.locked||!navigator.onLine||!S.user)return;syncing=true;chip('Syncing...');
+ try{const q=(await all('queue')).filter(o=>!o.failed).sort((a,b)=>a.seq-b.seq);
+  if(q.length){const d=await api('push',{ops:q.map(({seq,failed,...o})=>o)});
+   for(const r of d.results){if(r.status==='ok'||r.status==='duplicate')await del('queue',r.opId);else if(r.status==='rejected'){const o=await get('queue',r.opId);o.failed=r.error;await put('queue',o);}else if(r.status==='auth'){toast('Please sign in again to finish syncing.',1);}}}
+  const p=await api('pull',{token:S.token,since:await kget('since')});
+  await kset('cfg',p.settings);await kset('since',p.serverTime);await kset('lic',p.license);
+  const rest=await all('queue');const items=p.items.filter(i=>i.Active==='TRUE'||i.Active===true);applyPending(items,rest);
+  await bulk('items',items,1);await bulk('debtors',p.debtors,1);await bulk('sales',p.sales);await bulk('saleItems',p.saleItems);await bulk('expenses',p.expenses||[]);await bulk('cash',p.cashReconciliation||[]);
+  const vo=new Set([...((await kget('voids'))||[]),...p.voids.map(v=>v.SaleID)]);await kset('voids',[...vo]);
+ }catch(e){if(e.code==='LICENSE_LOCKED'){lockScreen();syncing=false;return;}if(e.code==='AUTH')toast('Please sign in again to sync.',1);}
+ syncing=false;await load();chip();if(!document.activeElement||document.activeElement.tagName!=='INPUT')body();}
+function chip(m){const c=$('#chip');if(!c)return;c.textContent=m||(navigator.onLine?(S.pending?S.pending+' waiting to sync':'All synced'):'Offline'+(S.pending?', '+S.pending+' waiting':''))+(S.failed?', '+S.failed+' need attention':'');}
+addEventListener('online',sync);addEventListener('offline',()=>chip());setInterval(sync,30000);
+
+/* ---------- Subscription gate (basic version, the full reminder comes next) ---------- */
+async function gate(){let L=null;try{const d=await api('license.status');L=d.license;await kset('lic',L);await kset('seen',Date.now());
+  const fr=d.forceRefreshVersion,old=await kget('frv');if(old&&fr&&old!==fr){await kset('frv',fr);const k=await caches.keys();await Promise.all(k.map(x=>caches.delete(x)));location.reload();return false;}if(fr)await kset('frv',fr);}
+ catch(e){L=await kget('lic');const seen=await kget('seen')||0;if(Date.now()<seen-300000){lockScreen('This phone\'s date and time look wrong. Set them correctly to continue.');return false;}
+  if(L&&L.expiry&&new Date().toISOString().slice(0,10)>=L.expiry&&!(+L.graceDays>0)){lockScreen();return false;}}
+ if(L&&L.locked){lockScreen(null,L);return false;}
+ return true;}
+async function lockScreen(msg,L){S.locked=!msg;L=L||await kget('lic')||{};const own=S.user&&S.user.role==='owner';
+ $('#app').innerHTML=`<div class="login"><img src="assets/logo.png" alt="Supershores"><div class="card" style="text-align:left"><h2 style="margin-top:0">${esc(msg||'Subscription expired')}</h2>${msg?'':`<p>To renew, pay ${money(L.price||0)} to:<br><b>${esc(L.bank||'')}<br>${esc(L.accountName||'')}<br>${esc(L.accountNumber||'')}</b></p><p class="mute">Sales already made are saved on this phone and will sync after renewal.</p>`}
+ <div style="display:grid;gap:8px">${msg?'':own?'<button class="go" id="pay">Upload payment receipt</button>':'<button class="go" id="own">Owner sign in to renew</button>'}<button class="alt" id="again">Check again</button></div></div></div>`;
+ $('#again').onclick=()=>location.reload();const p=$('#pay');if(p)p.onclick=payFlow;const o=$('#own');if(o)o.onclick=()=>loginScreen();}
+
+/* ---------- Screens ---------- */
+function render(){$('#app').innerHTML=`<header><img src="assets/icon-192.png" alt=""><b>${esc(S.cfg.OrgName||'Supershores')}</b><span class="chip" id="chip"></span><button id="lk" aria-label="Lock">Lock</button></header><main id="main"></main>
+ <nav>${TABS().map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('')}</nav>`;$('#lk').onclick=logout;$('nav').onclick=e=>{if(e.target.dataset.t){S.tab=e.target.dataset.t;body();}};body();chip();}
+function body(){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));const m=$('#main');if(!m)return;if(!TABS().some(t=>t[0]===S.tab))S.tab='sell';(S.tab==='sell'?sellView:S.tab==='sales'?salesView:V[S.tab])(m);}
+const price=i=>Number(i.SellingPrice);
+const totals=()=>{const sub=S.cart.reduce((s,c)=>s+price(c.it)*c.qty,0),d=Math.min(S.disc,sub),vat=Math.round((sub-d)*(+S.cfg.VatRate||0)/100);return{sub,d,vat,total:sub-d+vat};};
+function sellView(m){const q=S.q.toLowerCase(),hits=q?S.items.filter(i=>i.Name.toLowerCase().includes(q)||String(i.Barcode)===S.q).slice(0,30):[];
+ m.innerHTML=`<div class="split"><div class="card"><input id="q" placeholder="Search item or scan barcode" value="${esc(S.q)}" autocomplete="off">${hits.map(i=>`<button class="item" data-add="${i.ItemID}"><span class="grow">${esc(i.Name)}<br><span class="mute ${i.CurrentStock<=0?'low':''}">${i.BundleJSON?'Bundle':i.CurrentStock+' in stock'}</span></span><b>${money(price(i))}</b></button>`).join('')||(q?'<p class="mute">Nothing found.</p>':'<p class="mute">Type a name or scan a barcode to add an item.</p>')}</div>${cartView()}</div>`;
+ const qi=$('#q');qi.oninput=()=>{S.q=qi.value;sellView(m);const n=$('#q');n.focus();n.setSelectionRange(n.value.length,n.value.length);};
+ qi.onkeydown=e=>{if(e.key==='Enter'){const x=S.items.find(i=>String(i.Barcode)===qi.value.trim());if(x){add(x.ItemID);S.q='';sellView(m);$('#q').focus();}}};
+ m.onclick=e=>{const b=e.target.closest('[data-add],[data-inc],[data-dec],[data-pay],#disc,#newc,#done');if(!b)return;const d=b.dataset;
+  if(d.add){add(d.add);S.q='';}else if(d.inc)chg(d.inc,1);else if(d.dec)chg(d.dec,-1);else if(d.pay){S.pay=d.pay;}else if(b.id==='disc')return discount();else if(b.id==='newc')return newCust();else if(b.id==='done')return complete();sellView(m);};
+ const cs=$('#cust');if(cs)cs.onchange=()=>S.cust=cs.value;}
+function cartView(){if(!S.cart.length)return'';const t=totals();return`<div class="card">${S.cart.map(c=>`<div class="row" style="padding:6px 0"><span class="grow">${esc(c.it.Name)}<br><span class="mute">${money(price(c.it))}</span></span><span class="qty"><button data-dec="${c.id}">-</button><b>${c.qty}</b><button data-inc="${c.id}">+</button></span><b style="min-width:80px;text-align:right">${money(price(c.it)*c.qty)}</b></div>`).join('')}
+ <div class="seg" style="margin:10px 0">${['Cash','Transfer','POS','Credit'].map(p=>`<button data-pay="${p}" class="${S.pay===p?'on':''}">${p}</button>`).join('')}</div>
+ ${S.pay==='Credit'?`<div class="row" style="margin-bottom:10px"><select id="cust" class="grow"><option value="">Choose customer</option>${S.debtors.map(d=>`<option value="${d.CustomerID}" ${S.cust===d.CustomerID?'selected':''}>${esc(d.Name)}</option>`).join('')}</select><button class="alt" id="newc">New</button></div>`:''}
+ <div class="tot"><div><span>Subtotal</span><span>${money(t.sub)}</span></div>${t.d?`<div><span>Discount</span><span>-${money(t.d)}</span></div>`:''}${t.vat?`<div><span>VAT</span><span>${money(t.vat)}</span></div>`:''}<div class="big"><span>Total</span><span>${money(t.total)}</span></div></div>
+ <div class="row" style="margin:10px 0"><button class="alt" id="disc">${t.d?'Change discount':'Add discount'}</button></div><button class="go" id="done">Complete sale</button></div>`;}
+function add(id){const it=S.items.find(i=>i.ItemID===id),c=S.cart.find(x=>x.id===id);c?c.qty++:S.cart.push({id,it,qty:1});}
+function chg(id,n){const c=S.cart.find(x=>x.id===id);c.qty+=n;if(c.qty<1)S.cart=S.cart.filter(x=>x!==c);if(!S.cart.length){S.disc=0;S.voucher=null;}}
+async function discount(){const owner=S.user.role==='owner';
+ const v=await ask('Discount',owner?[['amt','Amount'],['why','Reason']]:[['amt','Amount'],['why','Reason'],['oid','Owner ID'],['opin','Owner passcode','password']],'Apply');if(!v)return;
+ if(owner){S.disc=+v.amt||0;S.voucher=null;S.ownerWhy=v.why;}
+ else{if(!navigator.onLine)return toast('A discount needs an internet connection so the owner can approve it.',1);
+  try{const d=await api('authorizeDiscount',{token:S.token,ownerId:v.oid,ownerPin:v.opin,amount:+v.amt,reason:v.why});S.voucher=d.voucher;S.disc=+v.amt;}catch(e){toast(e.message,1);}}sellView($('#main'));}
+async function newCust(){const v=await ask('New customer',[['name','Name'],['phone','Phone']],'Save');if(!v||!v.name)return;const id='C-'+(await kget('dev')||'X')+'-'+Date.now().toString(36);
+ await enqueue('debtor.add',{customerId:id,name:v.name,phone:v.phone});S.debtors.push({CustomerID:id,Name:v.name,Phone:v.phone,Balance:0});S.cust=id;sellView($('#main'));}
+async function complete(){const dev=await kget('dev');if(!dev)return toast('Connect to the internet once to finish setting up this phone.',1);
+ if(S.pay==='Credit'&&!S.cust)return toast('Choose the customer who is buying on credit.',1);
+ const t=totals(),seq=((await kget('seq'))||0)+1;await kset('seq',seq);const id=dev+'-'+String(seq).padStart(4,'0');   // device code + counter kept on the phone: IDs never repeat
+ const disc=S.disc&&S.user.role==='owner'?{amount:S.disc,reason:S.ownerWhy||'Owner discount'}:undefined;
+ await enqueue('sale.create',{saleId:id,branch:(S.cfg.Branches||'').split(',')[0].trim(),lines:S.cart.map(c=>({itemId:c.id,qty:c.qty})),payment:S.pay,customerId:S.pay==='Credit'?S.cust:undefined,voucher:S.voucher||undefined,discount:disc});
+ const sale={SaleID:id,Timestamp:new Date().toISOString(),StaffID:S.user.id,StaffName:S.user.name,Subtotal:t.sub,DiscountAmount:t.d,VatAmount:t.vat,TotalAmount:t.total,PaymentMethod:S.pay,pending:true};
+ await put('sales',sale);for(const[n,c]of S.cart.entries())await put('saleItems',{SaleItemID:id+'-'+(n+1),SaleID:id,ItemName:c.it.Name,Quantity:c.qty,UnitPrice:price(c.it),LineTotal:price(c.it)*c.qty});
+ applyPending(S.items,[{type:'sale.create',payload:{lines:S.cart.map(c=>({itemId:c.id,qty:c.qty}))}}]);for(const i of S.items)await put('items',i);
+ S.cart=[];S.disc=0;S.voucher=null;S.cust='';S.pay='Cash';await load();chip();receipt(id);sync();}
+async function receipt(id){const s=await get('sales',id),L=(await all('saleItems')).filter(x=>x.SaleID===id).sort((a,b)=>a.SaleItemID.localeCompare(b.SaleItemID)),c=S.cfg;
+ const h=`<div class="rcpt"><img src="assets/logo.png" alt=""><div class="c"><b>${esc(c.ReceiptBusinessName||c.OrgName)}</b><br>${esc(c.ReceiptAddress||'')}<br>${esc(c.ReceiptPhone||'')}</div><hr>
+ <div>${esc(s.SaleID)}<br>${new Date(s.Timestamp).toLocaleString('en-NG')}${c.ReceiptShowStaffName!=='false'?'<br>Served by '+esc(s.StaffName):''}</div><hr>
+ ${L.map(x=>`<div>${esc(x.ItemName)}</div><div class="l"><span>${x.Quantity} x ${money(x.UnitPrice)}</span><span>${money(x.LineTotal)}</span></div>`).join('')}<hr>
+ <div class="l"><span>Subtotal</span><span>${money(s.Subtotal)}</span></div>${+s.DiscountAmount?`<div class="l"><span>Discount</span><span>-${money(s.DiscountAmount)}</span></div>`:''}${+s.VatAmount?`<div class="l"><span>VAT</span><span>${money(s.VatAmount)}</span></div>`:''}<div class="l"><b>TOTAL</b><b>${money(s.TotalAmount)}</b></div><div>Paid by ${esc(s.PaymentMethod)}</div><hr><div class="c">${esc(c.ReceiptFooterNote||'')}</div></div>`;
+ $('#print').innerHTML=h;const d=document.createElement('dialog');d.innerHTML=h+`<div class="row" style="margin-top:14px"><button class="alt grow" id="wa">WhatsApp</button><button class="grow" id="pr">Print</button><button class="alt" id="cl">Done</button></div>`;document.body.append(d);d.showModal();
+ const txt=`${c.ReceiptBusinessName||c.OrgName}\nReceipt ${s.SaleID}\n`+L.map(x=>`${x.ItemName} x${x.Quantity} ${money(x.LineTotal)}`).join('\n')+`\nTotal ${money(s.TotalAmount)} (${s.PaymentMethod})\n${c.ReceiptFooterNote||''}`;
+ d.querySelector('#wa').onclick=()=>open('https://wa.me/?text='+encodeURIComponent(txt));d.querySelector('#pr').onclick=()=>print();d.querySelector('#cl').onclick=()=>{d.remove();if(S.tab==='sell')body();};}
+async function salesView(m){const vo=new Set((await kget('voids'))||[]),day=new Date().toISOString().slice(0,10),q=new Set((await all('queue')).filter(o=>o.failed).map(o=>o.payload.saleId));
+ const rows=(await all('sales')).filter(s=>String(s.Timestamp).slice(0,10)===day).sort((a,b)=>b.Timestamp.localeCompare(a.Timestamp));
+ m.innerHTML=`<div class="card"><b>Today's sales</b>${rows.map(s=>`<button class="item" data-r="${s.SaleID}"><span class="grow">${esc(s.SaleID)}<br><span class="mute">${new Date(s.Timestamp).toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'})}, ${esc(s.PaymentMethod)}</span></span><span class="right"><b>${money(s.TotalAmount)}</b><br>${vo.has(s.SaleID)?'<span class="tag bad">Voided</span>':q.has(s.SaleID)?'<span class="tag bad">Rejected</span>':s.pending?'<span class="tag">Waiting</span>':'<span class="tag ok">Synced</span>'}</span></button>`).join('')||'<p class="mute">No sales yet today.</p>'}</div>
+ ${S.failed?'<div class="card"><b>Some changes were rejected by the server.</b><p class="mute">Show the owner. They are kept on this phone until it is sorted out.</p></div>':''}`;
+ m.onclick=e=>{const b=e.target.closest('[data-r]');if(b)receipt(b.dataset.r);};}
+
+/* ---------- Boot ---------- */
+/* Updates: check for a new version on every open and whenever the app comes back to the front. */
+function updateReady(){if(S.user&&S.cart.length){S.updatePending=true;if($('#upd'))return;const b=document.createElement('button');b.id='upd';b.textContent='New version ready. Tap to update after this sale';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:30;border-radius:0;background:var(--orange)';b.onclick=()=>location.reload();document.body.append(b);}else location.reload();}
+if('serviceWorker'in navigator){let had=!!navigator.serviceWorker.controller;
+ navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{r.update();setInterval(()=>r.update(),30*60*1000);addEventListener('visibilitychange',()=>{if(!document.hidden)r.update();});});
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had){had=true;return;}updateReady();});}
+(async()=>{await open();S.lastId=await kget('lastId');S.cfg=(await kget('cfg'))||{};
+ if(await gate())loginScreen();})();
+</script><script src="part2.js"></script><script src="renew.js"></script></body></html>
