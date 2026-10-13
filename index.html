@@ -11,7 +11,7 @@ button{border:0;border-radius:8px;padding:11px 16px;background:var(--blue);color
 button.alt{background:#fff;color:var(--blue);border:1px solid var(--blue)}button.go{background:var(--orange);font-size:1.12rem;width:100%;padding:15px}button:disabled{opacity:.5}
 :focus-visible{outline:3px solid var(--orange);outline-offset:2px}
 header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--blue);color:#fff;position:sticky;top:0;z-index:5}
-header img{width:34px;height:34px;border-radius:50%;background:#fff}header b{flex:1}header .chip{font-size:12.5px;background:#fff2;padding:3px 9px;border-radius:99px}
+header img{width:34px;height:34px;border-radius:50%;background:#fff}header b{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}header .chip{font-size:12.5px;background:#fff2;padding:3px 9px;border-radius:99px}
 header button{background:#fff2;padding:6px 10px}
 main{max-width:min(1400px,100%);margin:0 auto;padding:12px max(12px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left))}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
@@ -87,19 +87,26 @@ async function firstRun(){const v=await ask('Owner setup',[['code','Setup code']
 async function start(user,token){S.user=user;S.token=token;S.lastId=user.id;await kset('lastId',user.id);if(S.locked){lockScreen();return;}
  if(!(await kget('dev'))&&navigator.onLine){try{const d=await api('registerDevice',{token,label:navigator.userAgent.slice(0,40)});await kset('dev',d.deviceCode);}catch(e){}}
  await load();render();idleReset();remind();sync();}
+async function accountMenu(){const c=await menu('Account: '+S.user.name,['Change passcode','Lock now','Cancel']);if(c===0)changePass();if(c===1)logout();}
+async function changePass(){if(!navigator.onLine)return toast('Changing your passcode needs an internet connection.',1);
+ const v=await ask('Change passcode',[['o','Current passcode','password'],['n','New 6 digit passcode','password'],['n2','Repeat the new passcode','password']],'Change');if(!v)return;
+ if(!/^\d{6}$/.test(v.n))return toast('The new passcode must be exactly 6 digits.',1);if(v.n!==v.n2)return toast('The two new passcodes do not match.',1);if(v.n===v.o)return toast('Choose a different passcode.',1);
+ try{const d=await api('changePasscode',{token:S.token,oldPin:v.o,newPin:v.n}),users=(await kget('users'))||{};users[d.user.id]={user:d.user,token:d.token,ver:d.offlineVerifier};await kset('users',users);S.token=d.token;
+  for(const o of await all('queue'))if(o.by===S.user.id){o.token=d.token;await put('queue',o);}toast('Passcode changed. Other phones will ask you to sign in again.');}catch(e){toast(e.message,1);}}
 function logout(){S.user=S.token=null;S.cart=[];if(S.updatePending)return location.reload();loginScreen();}
 let idleT;function idleReset(){clearTimeout(idleT);if(!S.user)return;idleT=setTimeout(logout,(+S.cfg.LockTimeoutSeconds||60)*1000*5);}
 ['click','keydown','touchstart'].forEach(e=>addEventListener(e,idleReset));
 
 /* ---------- Data + sync ---------- */
 async function load(){S.items=await all('items');S.debtors=await all('debtors');S.cfg=(await kget('cfg'))||{};S.pending=(await all('queue')).filter(o=>!o.failed).length;S.failed=(await all('queue')).filter(o=>o.failed).length;}
-async function enqueue(type,payload){const op={opId:'op-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),seq:Date.now(),type,payload,token:S.token,ts:new Date().toISOString(),offline:!navigator.onLine};await put('queue',op);return op;}
+async function enqueue(type,payload){const op={opId:'op-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),by:S.user.id,seq:Date.now(),type,payload,token:S.token,ts:new Date().toISOString(),offline:!navigator.onLine};await put('queue',op);return op;}
 function applyPending(items,q){const by={};items.forEach(i=>by[i.ItemID]=i);q.filter(o=>o.type==='sale.create'&&!o.failed).forEach(o=>o.payload.lines.forEach(l=>{const it=by[l.itemId];if(!it)return;
  const comps=it.BundleJSON?JSON.parse(it.BundleJSON):null;(comps?comps.map(c=>[c.itemId,c.qty*l.qty]):[[it.ItemID,l.qty]]).forEach(([id,n])=>{if(by[id])by[id].CurrentStock-=n;});}));}
 let syncing=false;
 async function sync(){if(syncing||S.locked||!navigator.onLine||!S.user)return;syncing=true;chip('Syncing...');
  try{const q=(await all('queue')).filter(o=>!o.failed).sort((a,b)=>a.seq-b.seq);
-  if(q.length){const d=await api('push',{ops:q.map(({seq,failed,...o})=>o)});
+  for(const o of q)if(o.by===S.user.id&&o.token!==S.token){o.token=S.token;await put('queue',o);}   // your own waiting changes always travel with your current sign-in
+  if(q.length){const d=await api('push',{ops:q.map(({seq,failed,by,...o})=>o)});
    for(const r of d.results){if(r.status==='ok'||r.status==='duplicate')await del('queue',r.opId);else if(r.status==='rejected'){const o=await get('queue',r.opId);o.failed=r.error;await put('queue',o);}else if(r.status==='auth'){toast('Please sign in again to finish syncing.',1);}}}
   const p=await api('pull',{token:S.token,since:await kget('since')});
   await kset('cfg',p.settings);await kset('since',p.serverTime);await kset('lic',p.license);
@@ -124,8 +131,8 @@ async function lockScreen(msg,L){S.locked=!msg;L=L||await kget('lic')||{};const 
  $('#again').onclick=()=>location.reload();const p=$('#pay');if(p)p.onclick=payFlow;const o=$('#own');if(o)o.onclick=()=>loginScreen();}
 
 /* ---------- Screens ---------- */
-function render(){$('#app').innerHTML=`<header><img src="assets/icon-192.png" alt=""><b>${esc(S.cfg.OrgName||'Supershores')}</b><span class="chip" id="chip"></span><button id="lk" aria-label="Lock">Lock</button></header><main id="main"></main>
- <nav>${TABS().map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('')}</nav>`;$('#lk').onclick=logout;$('nav').onclick=e=>{if(e.target.dataset.t){S.tab=e.target.dataset.t;body();}};body();chip();}
+function render(){$('#app').innerHTML=`<header><img src="assets/icon-192.png" alt=""><b>${esc(S.cfg.OrgName||'Supershores')}</b><span class="chip" id="chip"></span><button id="lk" aria-label="Account menu">Account</button></header><main id="main"></main>
+ <nav>${TABS().map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('')}</nav>`;$('#lk').onclick=accountMenu;$('nav').onclick=e=>{if(e.target.dataset.t){S.tab=e.target.dataset.t;body();}};body();chip();}
 function body(){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));const m=$('#main');if(!m)return;if(!TABS().some(t=>t[0]===S.tab))S.tab='sell';(S.tab==='sell'?sellView:S.tab==='sales'?salesView:V[S.tab])(m);}
 const price=i=>Number(i.SellingPrice);
 const totals=()=>{const sub=S.cart.reduce((s,c)=>s+price(c.it)*c.qty,0),d=Math.min(S.disc,sub),vat=Math.round((sub-d)*(+S.cfg.VatRate||0)/100);return{sub,d,vat,total:sub-d+vat};};
