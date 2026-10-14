@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Supershores Inventory</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<meta name="theme-color" content="#1B4F9C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>#authGate{visibility:hidden}[data-i18n="ownDesignNote"]{display:none}.ssov{position:fixed;inset:0;z-index:9999;background:rgba(15,25,45,.78);display:grid;place-items:center;padding:16px;overflow:auto}.sscard{background:#fff;border-radius:var(--radius);max-width:440px;width:100%;padding:22px;box-shadow:var(--shadow-lg)}.sscard h2{margin:6px 0}.sscard img.lg{width:200px;max-width:70%;display:block;margin:0 auto 10px}.sscard input{width:100%;padding:10px;border:1px solid var(--paper-line);border-radius:8px;margin:4px 0 10px}.sscard .row{display:flex;gap:8px;flex-wrap:wrap}.sscard .row .btn{flex:1}.ssbar{position:fixed;top:0;left:0;right:0;z-index:9998;background:var(--gold);color:#000;border:0;padding:10px;font-weight:600;cursor:pointer}</style>
+</head>
+<body>
+<div class="authgate" id="authGate"><div class="authcard" id="authCard"></div></div>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" id="brandMark">S</div>
+      <div class="brand-text">
+        <h1>Supershores</h1>
+        <span data-i18n="tagline">Inventory · powered by CyberHayde</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <select class="langsel" id="langSel" onchange="setLang(this.value)">
+        <option value="en">English</option>
+        <option value="pcm">Pidgin</option>
+        <option value="yo">Yorùbá</option>
+        <option value="ig">Igbo</option>
+        <option value="fr">Français</option>
+        <option value="ha" disabled>Hausa (coming soon)</option>
+      </select>
+      <div class="whoami">
+        <div class="idbox"><div class="nm" id="whoName">—</div><div class="meta"><span class="mono" id="whoId">—</span> · <span class="rolebadge" id="whoRole">—</span></div></div>
+        <button class="logout" data-i18n="logout" onclick="logout()">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  
+
+  <nav class="tabs" id="tabs">
+    <button data-view="dashboard" class="active" data-i18n="navDash">Dashboard</button>
+    <button data-view="inventory" data-i18n="navInv">Inventory</button>
+    <button data-view="sale" data-i18n="navSale">Register Sale</button>
+    <button data-view="reports" id="tabReports" data-i18n="navReports">Reports</button>
+    <button data-view="debtors" id="tabDebtors" data-i18n="navDebtors">Debtors</button>
+    <button data-view="expenses" id="tabExpenses" data-i18n="navExpenses">Expenses</button>
+    <button data-view="activity" id="tabActivity" data-i18n="navActivity">Activity Log</button>
+    <button data-view="closeday" id="tabCloseday" data-i18n="navClose">Close Day</button>
+    <button data-view="settings" id="tabSettings" data-i18n="navSettings">Receipt Settings</button>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <div class="view active" id="view-dashboard">
+    <h2 class="viewtitle" data-i18n="dashTitle">Today, at a glance</h2>
+    <p class="viewsub" data-i18n="dashSub">Updates the instant a sale happens — no refresh, and it works the same with no internet connection.</p>
+    <div class="grid" id="dashCards"></div>
+    <div class="panel" id="lowStockPanel">
+      <h3><span data-i18n="lowStockTitle">Low stock — needs reordering soon</span>
+        <span class="actions" id="lowStockWaBtn"></span></h3>
+      <div class="tablewrap"><table class="ledger"><thead><tr><th></th><th>Item</th><th>Category</th><th data-i18n="colStock">In stock</th><th data-i18n="colReorder">Reorder at</th><th></th></tr></thead>
+      <tbody id="lowStockBody"></tbody></table></div>
+    </div>
+    <div class="panel" id="expiringPanel" style="display:none;">
+      <h3 data-i18n="expiringSoon">Expiring soon</h3>
+      <div class="tablewrap"><table class="ledger"><thead><tr><th></th><th>Item</th><th>Category</th><th>Stock</th><th>Status</th></tr></thead>
+      <tbody id="expiringBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div class="view" id="view-inventory">
+    <h2 class="viewtitle" data-i18n="navInv">Inventory</h2>
+    <p class="viewsub" data-i18n="invSub">Instant search, scan a barcode, or add a brand new product — both Admin and Staff can add products; only Admin sets cost price.</p>
+    <div class="searchbar">
+      <input type="text" id="invSearch" data-i18n-ph="searchPh" placeholder="Search by name, category, or barcode…" oninput="renderInventory()">
+      <select id="invCategory" onchange="renderInventory()"><option value="" data-i18n="allCats">All categories</option></select>
+      <select id="invBranch" onchange="renderInventory()"><option value="" data-i18n="allBranches">All branches</option></select>
+      <button class="btn ghost" onclick="openScanner('inventory')">📷 <span data-i18n="scanBtn">Scan</span></button>
+      <button class="btn ghost" id="importBtn" onclick="document.getElementById('importFile').click()" data-i18n="importBtnLabel">⬆ Import CSV/Excel</button>
+      <input type="file" id="importFile" accept=".csv,.xlsx,.xls" style="display:none;" onchange="handleImportFile()">
+      <button class="btn gold" onclick="toggleAddBox()">+ <span data-i18n="addItemBtn">Add Item</span></button>
+    </div>
+    <div class="panel" id="importPanel" style="display:none;">
+      <h3 data-i18n="importProductsTitle">Import products</h3>
+      <p class="helptext" id="importSummary" style="margin-bottom:10px;"></p>
+      <div class="tablewrap"><table class="ledger"><thead><tr><th>Name</th><th>Category</th><th>Unit</th><th>Stock</th><th>Cost</th><th>Price</th><th>Result</th></tr></thead>
+      <tbody id="importPreviewBody"></tbody></table></div>
+      <div style="display:flex; gap:9px; margin-top:12px; flex-wrap:wrap;">
+        <button class="btn gold" onclick="confirmImport()" id="confirmImportBtn" data-i18n="importTheseBtn">Import these items</button>
+        <button class="btn ghost" onclick="cancelImport()">Cancel</button>
+      </div>
+    </div>
+    <div class="panel addbox" id="addBox">
+      <h3 data-i18n="addNewProduct">Add a new product</h3>
+      <div class="form-row split">
+        <div><label data-i18n="fldName">Product name</label><input type="text" id="newName" placeholder="e.g. Type-C Fast Charger"></div>
+        <div><label data-i18n="fldCategory">Category</label><select id="newCategory"></select></div>
+      </div>
+      <div class="form-row split3">
+        <div><label data-i18n="fldUnit">Unit</label><input type="text" id="newUnit" placeholder="piece, pack, carton…"></div>
+        <div><label data-i18n="fldPrice">Selling price (₦)</label><input type="number" id="newPrice" placeholder="0"></div>
+        <div id="costFieldWrap"><label data-i18n="fldCost">Cost price (₦)</label><input type="number" id="newCost" placeholder="0"></div>
+      </div>
+      <div class="form-row split">
+        <div><label data-i18n="fldStock">Starting stock</label><input type="number" id="newStock" placeholder="0"></div>
+        <div><label data-i18n="fldReorder">Reorder threshold</label><input type="number" id="newReorder" placeholder="0"></div>
+      </div>
+      <div class="form-row split">
+        <div><label data-i18n="supplierLabel">Supplier</label> <input type="text" id="newSupplier" placeholder="e.g. Alaba Market — Emeka Electronics"></div>
+        <div><label data-i18n="newExpiryOptional">Expiry date (optional)</label><input type="date" id="newExpiry"></div>
+        <div><label data-i18n="branchLabel">Branch</label> <span style="font-weight:400; color:var(--muted);" data-i18n="branchOptionalNote">(optional)</span><select id="newBranch"></select></div>
+      </div>
+      <div class="form-row">
+        <label data-i18n="fldPhoto">Product photo (optional)</label>
+        <div class="photoInputRow">
+          <img class="photoPreview" id="newPhotoPreview" src="" style="display:none;">
+          <div class="thumb-ph" id="newPhotoPlaceholder" style="width:60px;height:60px;font-size:22px;">📷</div>
+          <input type="file" accept="image/*" id="newPhoto" onchange="previewPhoto()">
+        </div>
+      </div>
+      <div class="form-row">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="newIsBundle" onchange="toggleBundleBuilder()" style="width:auto;"> <span data-i18n="bundleCheckboxLabel">This is a bundle of other products (a combo pack)</span></label>
+        <div id="bundleBuilder" style="display:none; margin-top:10px; padding:12px; background:var(--paper); border-radius:9px;">
+          <div class="searchbar">
+            <select id="bundleComponentSelect"></select>
+            <input type="number" id="bundleComponentQty" placeholder="Qty" style="max-width:80px;">
+            <button class="btn sm gold" onclick="addBundleComponent()">Add</button>
+          </div>
+          <div id="bundleComponentList"></div>
+          <p class="helptext" data-i18n="bundleHelp">Stock for a bundle is calculated automatically from its components — selling it decrements each component, not a separate count.</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="newTrackBatches" style="width:auto;"> <span data-i18n="batchCheckboxLabel">Track batch/serial numbers for this product</span></label>
+        <p class="helptext" data-i18n="batchHelp">Useful for anything with a warranty or recall risk. You'll enter a batch/serial code each time you restock it.</p>
+      </div>
+      <p class="helptext" id="staffCostNote" style="display:none;" data-i18n="staffCostNote">You can add the product now — an Admin will fill in the cost price later so profit reports stay accurate.</p>
+      <div style="display:flex; gap:9px; margin-top:4px; flex-wrap:wrap;">
+        <button class="btn gold" onclick="submitNewItem()" data-i18n="saveProduct">Save product</button>
+        <button class="btn ghost" onclick="toggleAddBox()" data-i18n="cancel">Cancel</button>
+      </div>
+    </div>
+    <div class="panel"><div class="tablewrap"><table class="ledger"><thead id="invHead"></thead><tbody id="invBody"></tbody></table></div></div>
+  </div>
+
+  <!-- REGISTER SALE -->
+  <div class="view" id="view-sale">
+    <h2 class="viewtitle" data-i18n="navSale">Register Sale</h2>
+    <p class="viewsub" data-i18n="saleSub">Search, scan, or add — built to take under a minute, even with several items in the basket.</p>
+    <div class="sale-layout">
+      <div class="panel">
+        <h3><span data-i18n="addItems">Add items</span></h3>
+        <div class="searchbar">
+          <input type="text" id="saleSearch" data-i18n-ph="scanSearchPh" placeholder="Search or scan an item…" oninput="renderSaleSearch()">
+          <button class="btn ghost" onclick="openScanner('sale')">📷 <span data-i18n="scanBtn">Scan</span></button>
+        </div>
+        <div id="saleSearchResults"></div>
+      </div>
+      <div class="panel">
+        <h3 data-i18n="currentSale">Current sale</h3>
+        <div id="cartList"><p class="helptext" data-i18n="noItemsYet">No items added yet — search on the left to begin.</p></div>
+        <div class="radio-group" id="payMethods">
+          <label class="checked"><input type="radio" name="pay" value="Cash" checked> <span data-i18n="payCash">Cash</span></label>
+          <label><input type="radio" name="pay" value="Transfer"> <span data-i18n="payTransfer">Transfer</span></label>
+          <label><input type="radio" name="pay" value="POS"> POS</label>
+          <label><input type="radio" name="pay" value="Credit"> <span data-i18n="payCredit">Credit</span></label>
+        </div>
+        <div class="form-row" id="creditNameRow" style="display:none;"><label data-i18n="customerName">Customer name</label><input type="text" id="creditName" placeholder="e.g. Mrs Bello"></div>
+        <div id="discountRow" style="margin-bottom:8px;">
+          <button class="btn sm ghost" onclick="toggleDiscountBox()" id="discountToggleBtn" data-i18n="applyDiscountBtn">+ Apply discount</button>
+          <span id="discountAppliedNote" style="font-size:12px; color:var(--sage); font-weight:600;"></span>
+        </div>
+        <div class="addbox" id="discountBox">
+          <div class="form-row split3">
+            <div><label data-i18n="discountTypeLabel">Discount type</label><select id="discountType"><option value="amount" data-i18n="discountAmountOpt">₦ amount</option><option value="percent" data-i18n="discountPercentOpt">% off</option></select></div>
+            <div><label data-i18n="discountValueLabel">Value</label><input type="number" id="discountValue" placeholder="0"></div>
+            <div><label data-i18n="discountReasonLabel">Reason</label><input type="text" id="discountReason" data-i18n-ph="discountReasonPh" placeholder="e.g. loyal customer"></div>
+          </div>
+          <button class="btn gold" onclick="requestDiscount()" data-i18n="getDiscountAuthBtn">Get discount authorized</button>
+          <button class="btn ghost" onclick="toggleDiscountBox()" data-i18n="cancel">Cancel</button>
+        </div>
+        <div class="total-row"><span class="lbl" data-i18n="total">Total</span><span class="amt" id="cartTotal">₦0</span></div>
+        <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+          <button class="btn gold" id="completeSaleBtn" onclick="completeSale()" disabled data-i18n="completeSale">Complete Sale &amp; Print Receipt</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="view" id="view-reports">
+    <h2 class="viewtitle" data-i18n="navReports">Reports</h2>
+    <p class="viewsub" data-i18n="reportsSub">Admin-only — staff never see cost price or profit.</p>
+    <div id="reportsLocked" class="locked-note" style="display:none;" data-i18n="reportsLockedTxt">Switch to an Admin account to see profit figures and reports. Staff accounts genuinely cannot reach this screen — it isn't just hidden, it's blocked.</div>
+    <div id="reportsContent">
+      <div class="panel">
+        <h3>Date range</h3>
+        <div class="radio-group" id="rangePresets">
+          <label class="checked"><input type="radio" name="range" value="today" checked> Today</label>
+          <label><input type="radio" name="range" value="yesterday"> Yesterday</label>
+          <label><input type="radio" name="range" value="week"> This week</label>
+          <label><input type="radio" name="range" value="month"> This month</label>
+          <label><input type="radio" name="range" value="all"> All time</label>
+          <label><input type="radio" name="range" value="custom"> Custom</label>
+        </div>
+        <div class="form-row split" id="customRangeRow" style="display:none; max-width:420px;">
+          <div><label>From</label><input type="date" id="rangeFrom" onchange="renderReports()"></div>
+          <div><label>To</label><input type="date" id="rangeTo" onchange="renderReports()"></div>
+        </div>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);" id="reportCards"></div>
+      <div class="panel">
+        <h3><span>Estimated future profit</span></h3>
+        <p class="helptext" style="margin:-6px 0 10px;">Projected from the average daily profit across the range selected above — an estimate based on recent trend, not a guarantee.</p>
+        <div class="grid" style="grid-template-columns:repeat(2,1fr);" id="futureEstimateCards"></div>
+      </div>
+      <div class="panel"><h3><span data-i18n="reorderSuggest">Reorder suggestions</span><span class="actions"><button class="btn sm ghost" onclick="printReorderSuggestions()">🖨 Print</button></span></h3>
+        <p class="helptext" style="margin:-6px 0 10px;" data-i18n="reorderHelp">Based on how fast each item has actually been selling — no guesswork.</p>
+        <div class="tablewrap"><table class="ledger"><thead><tr><th>Item</th><th data-i18n="avgDaily">Avg. daily sales</th><th data-i18n="daysLeft">Est. days of stock left</th><th></th></tr></thead><tbody id="reorderBody"></tbody></table></div>
+      </div>
+      <div class="panel"><h3 data-i18n="topSellers">Top sellers</h3><span class="actions"><button class="btn sm ghost" onclick="printTopSellers()">🖨 Print</button></span><div class="tablewrap"><table class="ledger"><thead><tr><th>Item</th><th data-i18n="qtySold">Qty sold</th><th data-i18n="revenue">Revenue</th></tr></thead><tbody id="topSellersBody"></tbody></table></div></div>
+      <div class="panel"><h3><span data-i18n="salesLog">Sales log</span><span class="actions"><button class="btn sm ghost" onclick="printSalesLog()">🖨 Print</button><button class="btn sm ghost" onclick="exportCSV('sales')">⬇ CSV</button></span></h3>
+        <div class="tablewrap"><table class="ledger"><thead><tr><th>Receipt #</th><th>Time</th><th>Staff</th><th>Payment</th><th>Total</th><th></th></tr></thead><tbody id="salesLogBody"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY LOG -->
+  <div class="view" id="view-debtors">
+    <h2 class="viewtitle" data-i18n="debtorsTitle">Debtors — customer credit</h2>
+    <p class="viewsub" data-i18n="debtorsSub">Every credit sale lands here automatically. Record a payment as money comes in, or add a customer manually.</p>
+    <div class="panel">
+      <div class="searchbar">
+        <input type="text" id="debtorSearch" data-i18n-ph="debtorSearchPh" placeholder="Search a customer…" oninput="renderDebtors()">
+        <button class="btn gold" onclick="toggleAddDebtorBox()" data-i18n="addCustomerBtn">+ Add Customer</button>
+      </div>
+      <div class="addbox" id="addDebtorBox">
+        <div class="form-row split">
+          <div><label data-i18n="customerNameLabel">Customer name</label><input type="text" id="newDebtorName" placeholder="e.g. Mrs Bello"></div>
+          <div><label data-i18n="customerPhoneLabel">Phone (optional)</label><input type="text" id="newDebtorPhone" placeholder="080…"></div>
+        </div>
+        <button class="btn gold" onclick="submitNewDebtor()" data-i18n="saveCustomerBtn">Save customer</button>
+        <button class="btn ghost" onclick="toggleAddDebtorBox()" data-i18n="cancel">Cancel</button>
+      </div>
+      <div class="tablewrap"><table class="ledger"><thead><tr><th>ID</th><th data-i18n="colCustomer">Customer</th><th data-i18n="colPhone">Phone</th><th data-i18n="colBalanceOwed">Balance owed</th><th></th></tr></thead>
+      <tbody id="debtorsBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-expenses">
+    <h2 class="viewtitle" data-i18n="expensesTitle">Expenses</h2>
+    <p class="viewsub" data-i18n="expensesSub">Admin-only. Logged expenses are subtracted from gross profit in Reports to give you real net profit for the selected date range.</p>
+    <div id="expensesLocked" class="locked-note" style="display:none;" data-i18n="expensesLockedTxt">Admin-only screen.</div>
+    <div id="expensesContent">
+      <div class="panel">
+        <h3 data-i18n="logExpenseTitle">Log an expense</h3>
+        <div class="form-row split3">
+          <div><label data-i18n="categoryLabel">Category</label><select id="newExpenseCategory"><option data-i18n="catRent">Rent</option><option data-i18n="catTransport">Transport</option><option data-i18n="catStaffPay">Staff Pay</option><option data-i18n="catUtilities">Utilities</option><option data-i18n="catMisc">Miscellaneous</option></select></div>
+          <div><label data-i18n="amountLabel">Amount (₦)</label><input type="number" id="newExpenseAmount" placeholder="0"></div>
+          <div><label data-i18n="dateLabel">Date</label><input type="date" id="newExpenseDate"></div>
+        </div>
+        <div class="form-row"><label data-i18n="noteOptionalLabel">Note (optional)</label><input type="text" id="newExpenseNote" placeholder="e.g. Generator fuel"></div>
+        <button class="btn gold" onclick="submitExpense()" data-i18n="logExpenseBtn">Log expense</button>
+      </div>
+      <div class="panel">
+        <h3><span data-i18n="expenseLogTitle">Expense log</span><span class="actions"><button class="btn sm ghost" onclick="printExpenses()">🖨 Print</button></span></h3>
+        <div class="tablewrap"><table class="ledger"><thead><tr><th data-i18n="colDate">Date</th><th data-i18n="categoryLabel">Category</th><th data-i18n="colAmount">Amount</th><th data-i18n="colLoggedBy">Logged by</th><th data-i18n="colNote">Note</th><th></th></tr></thead>
+        <tbody id="expensesBody"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-activity">
+    <h2 class="viewtitle" data-i18n="navActivity">Activity Log</h2>
+    <p class="viewsub" data-i18n="activitySub">Admin-only. Every action in the app — who did it, and exactly when — traced to a real registered account, not a shared login.</p>
+    <div id="activityLocked" class="locked-note" style="display:none;" data-i18n="activityLockedTxt">Admin-only screen. This is the anti-theft layer — staff can't see it, and can't clear it.</div>
+    <div id="activityContent" class="panel"><h3><span></span><span class="actions"><button class="btn sm ghost" onclick="printActivityLog()">🖨 Print</button></span></h3><div class="tablewrap"><table class="ledger"><thead><tr><th>Time</th><th>User</th><th>Role</th><th>Action</th></tr></thead><tbody id="activityBody"></tbody></table></div></div>
+  </div>
+
+  <!-- CLOSE DAY -->
+  <div class="view" id="view-closeday">
+    <h2 class="viewtitle" data-i18n="navClose">Close Day</h2>
+    <p class="viewsub" data-i18n="closeSub">Admin-only. A quick end-of-day review — sales, low stock, and a cash count in one place.</p>
+    <div id="closedayLocked" class="locked-note" style="display:none;" data-i18n="closedayLockedTxt">Admin-only screen.</div>
+    <div id="closedayContent">
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);" id="closeCards"></div>
+      <div class="panel">
+        <h3 data-i18n="cashCount">Cash count</h3>
+        <p class="helptext" style="margin:-4px 0 10px;" id="expectedCashNote"></p>
+        <div class="form-row" style="max-width:260px;"><label data-i18n="countedCash">Cash counted in till (₦)</label><input type="number" id="countedCash" placeholder="0" oninput="updateCashDiff()"></div>
+        <p id="cashDiffNote" style="font-size:13px; font-weight:600;"></p>
+        <button class="btn gold" onclick="confirmCloseDay()" data-i18n="closeDayBtn">Confirm &amp; Close Day</button>
+        <button class="btn ghost" onclick="printCloseDay()">🖨 Print close-day report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="view" id="view-settings">
+    <h2 class="viewtitle" data-i18n="navSettings">Receipt Settings</h2>
+    <p class="viewsub" data-i18n="settingsSub">Admin-only. Change these and go complete a sale to see the receipt update instantly.</p>
+    <div id="settingsLocked" class="locked-note" style="display:none;" data-i18n="settingsLockedTxt">Admin-only — staff can print receipts, but never change how they look.</div>
+    <div id="settingsContent">
+      <div class="panel">
+        <h3 data-i18n="businessDetails">Business details on receipt</h3>
+        <div class="form-row split"><div><label data-i18n="bizName">Business name</label><input type="text" id="setName"></div><div><label data-i18n="phone">Phone number</label><input type="text" id="setPhone"></div></div>
+        <div class="form-row">
+          <label>Brand colors <span style="font-weight:400; color:var(--muted);">(changes the app's whole color scheme, everywhere)</span></label>
+          <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+            <div style="display:flex; flex-direction:column; gap:4px;"><span class="helptext" style="margin:0;">Primary (buttons, header)</span><input type="color" id="setBrandPrimary" style="width:60px; height:38px; padding:2px; border:1.5px solid var(--paper-line); border-radius:8px; cursor:pointer;"></div>
+            <div style="display:flex; flex-direction:column; gap:4px;"><span class="helptext" style="margin:0;">Accent (highlights, links)</span><input type="color" id="setBrandAccent" style="width:60px; height:38px; padding:2px; border:1.5px solid var(--paper-line); border-radius:8px; cursor:pointer;"></div>
+            <button class="btn sm ghost" onclick="resetBrandColors()">Reset to default</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Brand logo <span style="font-weight:400; color:var(--muted);">(optional — shows in the header, on receipts, and on printed reports)</span></label>
+          <div class="photoInputRow">
+            <img class="photoPreview" id="setLogoPreview" src="" style="display:none;">
+            <div class="thumb-ph" id="setLogoPlaceholder" style="width:60px;height:60px;font-size:22px;">🖼️</div>
+            <input type="file" accept="image/*" id="setLogoFile" onchange="previewLogo()">
+            <button class="btn sm ghost" id="setLogoRemoveBtn" onclick="removeLogo()" style="display:none;">Remove logo</button>
+          </div>
+        </div>
+        <div class="form-row"><label data-i18n="address">Address</label><input type="text" id="setAddress"></div>
+        <div class="form-row"><label data-i18n="footerNote">Footer note</label><input type="text" id="setFooter"></div>
+        <div class="form-row"><label data-i18n="whatsappNumber">WhatsApp number for alerts</label><input type="tel" id="setWa" placeholder="e.g. 2348032148890"></div>
+        <div class="form-row"><label>Bluetooth thermal printer service UUID <span style="font-weight:400; color:var(--muted);">(advanced, optional)</span></label>
+          <input type="text" id="setBtService" placeholder="000018f0-0000-1000-8000-00805f9b34fb">
+          <p class="helptext">Only needed for the "Bluetooth thermal print" button on receipts. Most cheap 58mm BLE printers use the default shown — if yours doesn't respond, check the model's manual for its actual service/characteristic UUID. This is a best-effort feature: Bluetooth printer protocols vary a lot between brands, and it only works in Chrome/Edge on Android or desktop (not Safari/iOS, which doesn't support Web Bluetooth at all — use the regular Print button there).</p>
+        </div>
+        <div class="form-row"><label data-i18n="paperSize">Paper size</label>
+          <div class="radio-group" id="paperGroup">
+            <label class="checked"><input type="radio" name="paper" value="Thermal 58mm" checked> Thermal 58mm</label>
+            <label><input type="radio" name="paper" value="Thermal 80mm"> Thermal 80mm</label>
+            <label><input type="radio" name="paper" value="A4"> A4 / Letter</label>
+          </div>
+          <p class="helptext" data-i18n="paperHelp">Prints on whatever printer the shop already owns — no special hardware needed.</p>
+        </div>
+        <div class="form-row"><label data-i18n="lockTimeout">Auto-lock after inactivity</label>
+          <select id="setLockTimeout"><option value="60">1 minute</option><option value="180">3 minutes</option><option value="300">5 minutes</option><option value="0">Never</option></select>
+        </div>
+        <div class="form-row" style="max-width:220px;"><label data-i18n="vatRate">VAT rate (%)</label><input type="number" id="setVat" min="0" step="0.5" placeholder="0"></div>
+        <button class="btn" onclick="saveSettings()" data-i18n="saveSettings">Save receipt settings</button>
+      </div>
+      <div class="panel">
+        <h3 data-i18n="branchesTitle">Branches / locations</h3>
+        <p class="helptext" style="margin-bottom:10px;" data-i18n="branchesSub">Add a branch name to tag products by location. Leave as just "Main" if this is a single-location business.</p>
+        <div class="searchbar" style="margin-bottom:12px;">
+          <input type="text" id="newBranchName" data-i18n-ph="newBranchPh" placeholder="e.g. Ikeja Branch">
+          <button class="btn gold" onclick="addBranch()" data-i18n="addBranchBtn">+ Add branch</button>
+        </div>
+        <div id="branchList"></div>
+      </div>
+      <div class="panel">
+        <h3 data-i18n="manageStaff">Manage staff</h3>
+        <p class="helptext" style="margin-bottom:10px;">Reset a forgotten password, or cut off access the moment someone leaves — no ticket, no waiting.</p>
+        <div class="tablewrap"><table class="ledger"><thead><tr><th data-i18n="colId">ID</th><th data-i18n="colName">Name</th><th data-i18n="colRole">Role</th><th data-i18n="colAccountStatus">Status</th><th></th></tr></thead>
+        <tbody id="staffMgmtBody"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <h3 data-i18n="ownDesign">Prefer your own design?</h3>
+        <p class="helptext" style="margin-bottom:10px;" data-i18n="ownDesignSub">Instead of customizing the fields above, upload a complete receipt template and we'll use your exact layout.</p>
+        <input type="file" disabled>
+        <p class="helptext" data-i18n="ownDesignNote">(Upload is wired up in the real per-client build — disabled here since this is a shared demo.)</p>
+      </div>
+      <div class="panel">
+        <h3 data-i18n="exportData">Export your data</h3>
+        <p class="helptext" style="margin-bottom:10px;" data-i18n="exportSub">Your data is always yours — export it any time, no support ticket required.</p>
+        <div style="display:flex; gap:9px; flex-wrap:wrap;">
+          <button class="btn ghost" onclick="exportCSV('items')">⬇ <span data-i18n="exportInv">Export Inventory CSV</span></button>
+          <button class="btn ghost" onclick="exportCSV('sales')">⬇ <span data-i18n="exportSales">Export Sales CSV</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="pitch" data-i18n="pitchFooter">
+    Built for businesses that outgrew the notebook, but aren't ready for expensive enterprise software.<br>
+    Every organization gets a private setup like this one — their own data, their own branding, their own staff accounts.
+  </footer>
+</div>
+
+<!-- BOTTOM NAV (mobile) -->
+<div class="bottomnav" id="bottomNav">
+  <div class="row">
+    <button data-view="dashboard" class="active" onclick="switchView('dashboard')"><span class="ic">🏠</span><span data-i18n="navDash">Dashboard</span></button>
+    <button data-view="inventory" onclick="switchView('inventory')"><span class="ic">📦</span><span data-i18n="navInv">Inventory</span></button>
+    <button data-view="sale" onclick="switchView('sale')"><span class="ic">🧾</span><span data-i18n="navSale">Sale</span></button>
+    <button onclick="openMore()"><span class="ic">⋯</span><span data-i18n="more">More</span></button>
+  </div>
+</div>
+<div class="moresheet" id="moreSheet" onclick="if(event.target===this) closeMore()">
+  <div class="sheet">
+    <div class="handle"></div>
+    <button class="sheetitem" id="moreReports" onclick="fromMore('reports')"><span class="ic">📊</span> <span data-i18n="navReports">Reports</span></button>
+    <button class="sheetitem" id="moreDebtors" onclick="fromMore('debtors')"><span class="ic">🧑‍🤝‍🧑</span> <span data-i18n="navDebtors">Debtors</span></button>
+    <button class="sheetitem" id="moreExpenses" onclick="fromMore('expenses')"><span class="ic">💸</span> <span data-i18n="navExpenses">Expenses</span></button>
+    <button class="sheetitem" id="moreActivity" onclick="fromMore('activity')"><span class="ic">🕵️</span> <span data-i18n="navActivity">Activity Log</span></button>
+    <button class="sheetitem" id="moreCloseday" onclick="fromMore('closeday')"><span class="ic">🔒</span> <span data-i18n="navClose">Close Day</span></button>
+    <button class="sheetitem" id="moreSettings" onclick="fromMore('settings')"><span class="ic">🧾</span> <span data-i18n="navSettings">Receipt Settings</span></button>
+    <button class="sheetitem" onclick="closeMore(); logout();"><span class="ic">↩</span> <span data-i18n="logout">Log out</span></button>
+  </div>
+</div>
+
+<!-- RECEIPT OVERLAY -->
+<!-- GENERIC PRINTABLE REPORT OVERLAY -->
+<!-- DISCOUNT AUTHORIZATION -->
+<!-- ONBOARDING TOUR -->
+<div class="overlay" id="tourOverlay">
+  <div class="authcard" style="width:380px;">
+    <div class="amark" id="tourIcon">👋</div>
+    <h2 id="tourTitle">Welcome</h2>
+    <p class="sub" id="tourBody"></p>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+      <a onclick="skipTour()" style="font-size:12px; color:var(--muted); cursor:pointer;">Skip tour</a>
+      <button class="btn gold" onclick="nextTourStep()" id="tourNextBtn">Next</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="discountAuthOverlay">
+  <div class="authcard" style="width:340px;">
+    <div class="amark">🔐</div>
+    <h2 data-i18n="discAuthTitle">Admin authorization needed</h2>
+    <p class="sub" id="discountAuthSub" data-i18n="discAuthDefaultSub">A staff member is requesting a discount. An Admin must enter their ID and password to approve it.</p>
+    <form autocomplete="on" onsubmit="event.preventDefault(); submitDiscountAuth();">
+      <div class="form-row"><label data-i18n="adminIdLabel">Admin ID</label><input type="text" id="discAuthId" name="username" autocomplete="username" placeholder="e.g. AD-001"></div>
+      <div class="form-row"><label data-i18n="adminPassLabel">Admin password</label><input type="password" id="discAuthPass" name="password" autocomplete="current-password"></div>
+      <div class="errtext" id="discAuthErr"></div>
+      <button type="submit" class="btn gold" style="width:100%; margin-top:6px;" data-i18n="approveDiscountBtn">Approve discount</button>
+    </form>
+    <button class="btn ghost" style="width:100%; margin-top:8px;" onclick="cancelDiscountAuth()" data-i18n="cancel">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="reportPrintOverlay">
+  <div class="receipt-wrap" style="max-width:640px;">
+    <div class="report-print" id="reportPrintContent"></div>
+    <div class="receipt-actions">
+      <button class="btn gold" onclick="window.print()">🖨 Print</button>
+      <button class="btn sage wabtn" onclick="shareReportWa()">💬 Send via WhatsApp</button>
+      <button class="btn ghost" onclick="closeReportPrint()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="receiptOverlay">
+  <div class="receipt-wrap">
+    <div class="receipt" id="receiptContent"></div>
+    <div class="receipt-actions">
+      <button class="btn gold" onclick="window.print()" data-i18n="printReceipt">Print receipt</button>
+      <button class="btn ghost wabtn" id="btPrintBtn" onclick="printEscPosBluetooth()" style="display:none;">🖨️ Bluetooth thermal print</button>
+      <button class="btn sage wabtn" onclick="shareReceiptWa()">💬 <span data-i18n="sendWa">Send via WhatsApp</span></button>
+      <button class="btn ghost" onclick="closeReceipt()" data-i18n="close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCANNER OVERLAY -->
+<div class="overlay" id="scanOverlay">
+  <div class="scanmodal">
+    <div id="scanBody"></div>
+    <div style="margin-top:12px;"><button class="btn ghost" style="color:#fff; border-color:rgba(255,255,255,0.4);" onclick="closeScanner()" data-i18n="close">Close</button></div>
+  </div>
+</div>
+
+<!-- LOCK SCREEN -->
+<div class="authgate" id="lockGate" style="display:none;">
+  <div class="authcard">
+    <div class="amark">🔒</div>
+    <h2 data-i18n="lockedTitle">Locked for inactivity</h2>
+    <p class="sub" id="lockWho"></p>
+    <div class="pinpad" id="pinDots"></div>
+    <div class="numpad" id="numpad"></div>
+    <div class="errtext" id="lockErr" style="text-align:center;"></div>
+    <div class="switchline"><a onclick="logout(); document.getElementById('lockGate').style.display='none';" data-i18n="notYou">Not you? Log out</a></div>
+  </div>
+</div>
+
+<script src="boot.js"></script>
+</body>
+</html>
