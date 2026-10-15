@@ -838,8 +838,8 @@ function renderSaleSearch(){
   const q = document.getElementById('saleSearch').value.toLowerCase();
   const results = q.length===0 ? [] : items.filter(i=>i.name.toLowerCase().includes(q) || (i.barcode||'').includes(q)).slice(0,6);
   document.getElementById('saleSearchResults').innerHTML = results.map(i=>`
-    <div class="add-row"><div class="left">${photoCell(i)}<div class="info"><b>${esc(i.name)}</b><br><span class="stock">${i.stock} ${esc(i.unit)} in stock · ${naira(i.price)}</span></div></div>
-    <button class="btn sm gold" onclick="addToCart(${i.id})" ${i.stock<1?'disabled':''}>Add</button></div>`).join('')
+    <div class="add-row"><div class="left">${photoCell(i)}<div class="info"><b>${esc(i.name)}</b><br><span class="stock">${itemAvailable(i)} ${esc(i.unit)} in stock · ${naira(i.price)}</span></div></div>
+    <button class="btn sm gold" onclick="addToCart(${i.id})" ${itemAvailable(i)<1?'disabled':''}>Add</button></div>`).join('')
     || (q ? `<p class="helptext">No matches.</p>` : `<p class="helptext">Start typing to find an item…</p>`);
 }
 function itemAvailable(item){ return item.bundle ? bundleAvailableStock(item) : item.stock; }
@@ -861,6 +861,7 @@ function consumeStock(item, qty){
 }
 function addToCart(id){
   const item = items.find(i=>i.id===id); const line = cart.find(c=>c.id===id);
+     if(!item || itemAvailable(item)<1){ alert((item?item.name:'This item')+' is out of stock.'); return; }
   if(line){ if(line.qty<itemAvailable(item)) line.qty++; } else cart.push({id:item.id, name:item.name, price:item.price, qty:1});
   renderCart();
 }
