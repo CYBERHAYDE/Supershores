@@ -159,9 +159,113 @@ window.ssTplSample=function(){const txt=`<!-- Receipt template. Edit the layout 
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/html'}));a.download='receipt-template-sample.html';a.click();};
 
 /* ---------- Reset inventory data (first admin only) ---------- */
-window.ssResetData=async function(){if(currentUser.id!=='AD-001')return alert('Only the first admin can reset the data.');if(!navigator.onLine)return alert('A reset needs an internet connection.');
- const pw=prompt('This erases ALL items, stock, sales, expenses and customers for this business, on every phone. A backup copy is saved first.\n\nEnter your password to continue:');if(!pw)return;
- if(prompt('Type RESET to confirm.')!=='RESET')return alert('Reset cancelled. Nothing was erased.');
+
+window.ssResetData = async function () {
+  if (!currentUser || currentUser.id !== 'AD-001') {
+    return alert('Only the first admin can reset the data.');
+  }
+
+  if (!navigator.onLine) {
+    return alert('A reset needs an internet connection.');
+  }
+
+  ssOverlay(`
+    <h2>Reset inventory data</h2>
+    <p class="helptext">
+      This erases inventory, stock, sales, expenses and customer data
+      across devices. A backup is saved first.
+    </p>
+
+    <form id="ssResetForm"
+      onsubmit="event.preventDefault(); ssConfirmReset();">
+
+      <div class="form-row">
+        <label for="ssResetPassword">Enter your password</label>
+        <input
+          id="ssResetPassword"
+          type="password"
+          autocomplete="current-password"
+          required
+          style="width:100%;"
+        >
+      </div>
+
+      <div class="form-row">
+        <label for="ssResetConfirm">
+          Type RESET to confirm
+        </label>
+        <input
+          id="ssResetConfirm"
+          type="text"
+          autocomplete="off"
+          required
+          style="width:100%;"
+        >
+      </div>
+
+      <div class="row">
+        <button type="submit" class="btn gold">
+          Confirm reset
+        </button>
+        <button type="button" class="btn ghost"
+          onclick="ssClose()">
+          Cancel
+        </button>
+      </div>
+    </form>
+  `, true);
+
+  document.getElementById('ssResetPassword').focus();
+};
+
+window.ssConfirmReset = async function () {
+  const password = document.getElementById('ssResetPassword');
+  const confirmation = document.getElementById('ssResetConfirm');
+
+  if (!password || !confirmation) return;
+
+  if (!password.value) {
+    password.focus();
+    return alert('Enter your password.');
+  }
+
+  if (confirmation.value.trim() !== 'RESET') {
+    confirmation.focus();
+    return alert('Type RESET exactly to confirm.');
+  }
+
+  const btn = document.querySelector('#ssResetForm button[type="submit"]');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Resetting...';
+  }
+
+  try {
+    const result = await SS.api('data.reset', {
+      token: currentUser.token,
+      pin: password.value,
+      confirm: 'RESET'
+    });
+
+    SY.wipeLocal(result.epoch);
+    logActivity('Reset all inventory data');
+    ssClose();
+
+    alert('Inventory data was reset successfully. A backup was saved.');
+  } catch (error) {
+    alert(error.message || 'Reset failed. Please try again.');
+  } finally {
+    const form = document.getElementById('ssResetForm');
+    if (form) {
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) {
+        submit.disabled = false;
+        submit.textContent = 'Confirm reset';
+      }
+    }
+  }
+};
+
  try{const r=await SS.api('data.reset',{token:currentUser.token,pin:pw,confirm:'RESET'});SY.wipeLocal(r.epoch);logActivity('Reset all inventory data');alert('All inventory data was erased. A backup copy of the Sheet was saved first.');}catch(e){alert(e.message);}};
 function ssInjectPanels(){const sc=document.getElementById('settingsContent');if(!sc)return;
  if(!document.getElementById('ssPanels'))sc.insertAdjacentHTML('beforeend',`<div id="ssPanels"><div class="panel"><h3>Receipt template</h3><p class="helptext">Upload your own receipt layout as an .html file. Use placeholders like {{business_name}}, {{items}} and {{total}}. <a onclick="ssTplSample()" style="cursor:pointer;text-decoration:underline">Download a sample</a> to start from.</p>
