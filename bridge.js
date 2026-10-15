@@ -23,8 +23,8 @@ function ssAsk(title,msg,fields,okLabel){return new Promise(res=>{
  document.body.append(d);d.querySelector('input').focus();});}
 
 /* ---------- Sign-in (server) ---------- */
-async function ssSaveUser(d,pass){const salt=randomSaltHex(),old=users.find(u=>u.id===d.user.id);
- const rec={id:d.user.id,name:d.user.name,role:ssRole(d.user.role),passSalt:salt,passHash:await hashSecret(pass,salt),pinHash:old?old.pinHash:null,pinSalt:old?old.pinSalt:null,active:true,token:d.token};
+async function ssSaveUser(d,pass){const salt=randomSaltHex(),ph=await hashSecret(pass,salt);
+ const rec={id:d.user.id,name:d.user.name,role:ssRole(d.user.role),passSalt:salt,passHash:ph,pinHash:ph,pinSalt:salt,active:true,token:d.token};
  const i=users.findIndex(u=>u.id===rec.id);i<0?users.push(rec):users[i]=rec;persistUsers();currentUser=rec;
  ssSet('ss_lic',d.subscription?Object.assign(ssGet('ss_lic',{}),{status:d.subscription.status}):ssGet('ss_lic',{}));}
 renderAuthGate=function(view){const card=document.getElementById('authCard'),setup=view==='setup'||view==='registerAdmin';
@@ -220,3 +220,12 @@ submitLogin=ssBusy(submitLogin,'Signing in...');submitRegisterAdmin=ssBusy(submi
  const tab=()=>document.querySelectorAll('a[onclick]:not([tabindex])').forEach(a=>{a.tabIndex=0;a.setAttribute('role','button');});
  tab();new MutationObserver(tab).observe(document.body,{childList:true,subtree:true});
 })();
+
+/* ---------- Lock screen uses the 6 digit password (no separate PIN to set per phone) ---------- */
+goToSetPin=function(){if(currentUser&&!currentUser.pinHash){currentUser.pinHash=currentUser.passHash;currentUser.pinSalt=currentUser.passSalt;const i=users.findIndex(u=>u.id===currentUser.id);if(i>=0){users[i]=currentUser;persistUsers();}}enterApp();};
+pinKey=async function(k){const err=document.getElementById('lockErr');if(pinLockedUntil>Date.now())return;
+ if(k==='⌫'){enteredPin=enteredPin.slice(0,-1);err.textContent='';renderPinDots();return;}
+ if(k==='✓'){await checkPin(err);return;}
+ if(enteredPin.length<6){enteredPin+=k;renderPinDots();err.textContent='';}
+ if(enteredPin.length===6)await checkPin(err);};
+renderPinDots=function(){document.getElementById('pinDots').innerHTML=[0,1,2,3,4,5].map(i=>`<div class="dot ${i<enteredPin.length?'filled':''}"></div>`).join('');};
