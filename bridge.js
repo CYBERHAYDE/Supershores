@@ -158,12 +158,11 @@ window.ssTplSample=function(){const txt=`<!-- Receipt template. Edit the layout 
 <div>Paid by {{payment_method}} ({{status}})</div><hr><div class="c">{{footer}}</div></div>`;
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/html'}));a.download='receipt-template-sample.html';a.click();};
 
-
+/* ---------- Reset inventory data (first admin only) ---------- */
 window.ssResetData=async function(){if(currentUser.id!=='AD-001')return alert('Only the first admin can reset the data.');if(!navigator.onLine)return alert('A reset needs an internet connection.');
  const pw=prompt('This erases ALL items, stock, sales, expenses and customers for this business, on every phone. A backup copy is saved first.\n\nEnter your password to continue:');if(!pw)return;
  if(prompt('Type RESET to confirm.')!=='RESET')return alert('Reset cancelled. Nothing was erased.');
  try{const r=await SS.api('data.reset',{token:currentUser.token,pin:pw,confirm:'RESET'});SY.wipeLocal(r.epoch);logActivity('Reset all inventory data');alert('All inventory data was erased. A backup copy of the Sheet was saved first.');}catch(e){alert(e.message);}};
-
 function ssInjectPanels(){const sc=document.getElementById('settingsContent');if(!sc)return;
  if(!document.getElementById('ssPanels'))sc.insertAdjacentHTML('beforeend',`<div id="ssPanels"><div class="panel"><h3>Receipt template</h3><p class="helptext">Upload your own receipt layout as an .html file. Use placeholders like {{business_name}}, {{items}} and {{total}}. <a onclick="ssTplSample()" style="cursor:pointer;text-decoration:underline">Download a sample</a> to start from.</p>
   <div class="form-row"><input type="file" id="ssTplFile" accept=".html,.htm,text/html"></div><p class="helptext" id="ssTplState"></p>
