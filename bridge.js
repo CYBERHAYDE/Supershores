@@ -124,7 +124,7 @@ window.ssPay=function(){const L=SS.lic||ssGet('ss_lic',{});
 if('serviceWorker'in navigator){let had=!!navigator.serviceWorker.controller;
  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{r.update();setInterval(()=>r.update(),30*60*1000);addEventListener('visibilitychange',()=>{if(!document.hidden)r.update();});});
  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had){had=true;return;}
-  if(typeof cart!=='undefined'&&cart.length){if(document.getElementById('ssBar'))return;const b=document.createElement('button');b.id='ssBar';b.className='ssbar';b.textContent='New version ready. Tap to update after this sale';b.onclick=()=>location.reload();document.body.append(b);}else location.reload();});}
+  if((typeof cart!=='undefined'&&cart.length)||document.getElementById('ssOv')){if(document.getElementById('ssBar'))return;const b=document.createElement('button');b.id='ssBar';b.className='ssbar';b.textContent='New version ready. Tap to update after this sale';b.onclick=()=>location.reload();document.body.append(b);}else location.reload();});}
 
 /* ---------- Start ---------- */
 const ssLogout=logout;logout=function(){SS.token=null;ssLogout();};
