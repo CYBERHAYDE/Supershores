@@ -30,7 +30,7 @@ async function ssSaveUser(d,pass){const salt=randomSaltHex(),ph=await hashSecret
  ssSet('ss_lic',d.subscription?Object.assign(ssGet('ss_lic',{}),{status:d.subscription.status}):ssGet('ss_lic',{}));}
 renderAuthGate=function(view){const card=document.getElementById('authCard'),setup=view==='setup'||view==='registerAdmin';
  const logo=`<img src="${window.SS_LOGO}" alt="Supershores" style="width:210px;max-width:80%;display:block;margin:0 auto 12px">`;
- card.innerHTML=setup?`${logo}<h2>Owner setup</h2><p class="sub">Enter the setup code you were given, then choose your name and a 6 digit password.</p>
+ card.innerHTML=setup?`${logo}<h2>Owner setup</h2><p class="sub">Enter the setup code you were given, then choose your name and a password.</p>
   <form autocomplete="off" onsubmit="event.preventDefault();ssSetup();"><div class="form-row"><label>Your full name</label><input type="text" id="aName" autocomplete="name"></div>
   <div class="form-row"><label>Password</label><input type="password" id="aPass" autocomplete="new-password"><p class="helptext">At least 6 characters, with a number and a special character (like @ # ! ?).</p></div>
   <div class="form-row"><label>Confirm password</label><input type="password" id="aPass2" autocomplete="new-password"></div>
