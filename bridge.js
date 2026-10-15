@@ -231,3 +231,18 @@ showLockScreen=function(){if(!currentUser)return;enteredPin='';pinLockedUntil=0;
 window.ssUnlock=async function(){const f=document.getElementById('lockPass'),err=document.getElementById('lockErr');if(!f||pinLockedUntil>Date.now())return;enteredPin=f.value;await checkPin(err);f.value='';};
 renderPinDots=function(){};
 renderNumpad=function(){const f=document.getElementById('lockPass');if(f){f.disabled=pinLockedUntil>Date.now();if(!f.disabled)f.focus();}};
+
+/* ---------- Expiring-soon banner: stays on screen for every day before expiry ---------- */
+SS.calc=function(L){if(!L||!L.expiry)return L;const a=ssToday().split('-').map(Number),b=L.expiry.split('-').map(Number),
+ daysLeft=Math.round((Date.UTC(b[0],b[1]-1,b[2])-Date.UTC(a[0],a[1]-1,a[2]))/864e5),g=+L.graceDays||0,r=+L.remindDays||7;
+ const state=L.state==='suspended'?'suspended':daysLeft>r?'active':daysLeft>0?'expiring':g+daysLeft>0?'grace':'expired';
+ return Object.assign({},L,{daysLeft,state,showReminder:state!=='active',locked:state==='suspended'||state==='expired',graceLeft:daysLeft<=0?Math.max(0,g+daysLeft):g});};
+SS.remind=function(){const L=SS.lic;if(!L||!L.showReminder||L.locked||!currentUser)return;const own=currentUser.role==='admin',
+ head=L.state==='grace'?`Your subscription has ended. ${L.graceLeft} grace day${L.graceLeft===1?'':'s'} left`:`Subscription ends in ${L.daysLeft} day${L.daysLeft===1?'':'s'}`;
+ ssOverlay(`<h2>${head}</h2><p>To renew, pay ${ssMoney(L.price)} to:<br><b>${esc(L.bank)}<br>${esc(L.accountName)}<br>${esc(L.accountNumber)}</b></p>${own?'':'<p class="helptext">Please tell the owner.</p>'}<div class="row">${own?'<button class="btn gold" onclick="ssPay()">Upload receipt</button>':''}<button class="btn ghost" onclick="ssClose()">Close</button></div>`,true);};
+SS.banner=function(){const L=SS.lic;let b=document.getElementById('ssExp');
+ if(!currentUser||!L||!L.showReminder||L.locked){if(b)b.remove();return;}
+ if(!b){b=document.createElement('button');b.id='ssExp';b.style.cssText='position:fixed;top:6px;left:50%;transform:translateX(-50%);z-index:9000;border:0;border-radius:99px;padding:7px 16px;font:700 13px/1.2 var(--font-sans,sans-serif);background:#F0A63D;color:#1b1b1b;box-shadow:0 2px 10px #0004;cursor:pointer;max-width:92vw';b.onclick=()=>SS.remind();document.body.append(b);}
+ b.textContent=L.state==='grace'?`Subscription ended: ${L.graceLeft} grace day${L.graceLeft===1?'':'s'} left. Tap to renew`:`Subscription ends in ${L.daysLeft} day${L.daysLeft===1?'':'s'}. Tap to renew`;};
+{const gate0=SS.gate;SS.gate=async function(){const ok=await gate0();if(!ok)return ok;if(SS.lic&&SS.lic.today!==ssToday())SS.lic=SS.calc(SS.lic);SS.banner();return ok;};   // works offline too, from the saved expiry date
+ const out0=logout;logout=function(){const b=document.getElementById('ssExp');if(b)b.remove();out0();};}
