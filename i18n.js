@@ -23,7 +23,9 @@ const I18N = {
     paperSize:'Paper size', paperHelp:'Prints on whatever printer the shop already owns — no special hardware needed.', lockTimeout:'Auto-lock after inactivity', vatRate:'VAT rate (%)', saveSettings:'Save receipt settings',
     ownDesign:'Prefer your own design?', ownDesignSub:"Instead of customizing the fields above, upload a complete receipt template and we'll use your exact layout.", ownDesignNote:'(Upload is wired up in the real per-client build — disabled here since this is a shared demo.)',
     exportData:'Export your data', exportSub:'Your data is always yours — export it any time, no support ticket required.', exportInv:'Export Inventory CSV', exportSales:'Export Sales CSV',
-    pitchFooter:"Built for businesses that outgrew the notebook, but aren't ready for expensive enterprise software.<br>Every organization gets a private setup like this one — their own data, their own branding, their own staff accounts.",
+    
+pitchFooter:"Powerful inventory management, built for the way your business works.<br>Every organization gets its own secure workspace, with dedicated data, custom branding, and staff access tailored to its needs.",
+
     editBtn:'Edit', editTitle:'Edit price & stock', restockBtn:'Restock', restockTitle:'Add received stock', expiringSoon:'Expiring soon', waAdminBtn:'WhatsApp Admin',
     qtyReceived:'Qty received', supplierLabel:'Supplier', supplierOptional:'Supplier (optional)', newExpiryOptional:'New expiry (optional)', addStock:'Add stock', save:'Save',
     colItem:'Item', colCategory:'Category', colCost:'Cost', colSellPrice:'Sell Price', colMargin:'Margin', colStatus:'Status',
