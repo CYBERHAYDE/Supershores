@@ -336,11 +336,11 @@ async function checkPin(err){
   enteredPin='';
   if(pinFailCount>=5){
     pinLockedUntil = Date.now()+30000;
-    err.textContent = 'Too many wrong PINs. Locked for 30 seconds — or log out and use your password.';
+    err.textContent = 'Too many wrong tries. Locked for 30 seconds — or log out and use your password.';
     renderNumpad();
     setTimeout(()=>{ pinFailCount=0; pinLockedUntil=0; err.textContent=''; renderNumpad(); }, 30000);
   } else {
-    err.textContent = `Incorrect PIN. (${5-pinFailCount} left before a short lockout)`;
+    err.textContent = `Incorrect password. (${5-pinFailCount} left before a short lockout)`;
   }
   renderPinDots();
 }
