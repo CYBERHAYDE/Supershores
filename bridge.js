@@ -12,6 +12,7 @@ const ssMoney=n=>'₦'+Number(n||0).toLocaleString('en-NG'),ssRole=r=>r==='owner
 function ssOverlay(html,closable){const old=document.getElementById('ssOv');if(old)old.remove();const d=document.createElement('div');d.className='ssov';d.id='ssOv';d.innerHTML=`<div class="sscard">${html}</div>`;if(closable)d.onclick=e=>{if(e.target===d)ssClose();};document.body.append(d);return d;}
 function ssClose(){const o=document.getElementById('ssOv');if(o)o.remove();if(SS.lic&&SS.lic.locked)ssLock();}   // while expired, closing any box brings the payment wall back
 const ssSay=t=>{const e=document.getElementById('ssMsg');if(e)e.textContent=t;};
+const ssPassRule=p=>p.length>=6&&p.length<=64&&/\d/.test(p)&&/[^A-Za-z0-9\s]/.test(p),ssPassMsg='Password must be at least 6 characters and include a number and a special character (like @ # ! ?).';
 /* Masked input box: use this instead of prompt() whenever a password is typed */
 function ssAsk(title,msg,fields,okLabel){return new Promise(res=>{
  const d=document.createElement('div');d.className='ssov';d.id='ssAsk';d.style.zIndex=10000;
@@ -31,8 +32,8 @@ renderAuthGate=function(view){const card=document.getElementById('authCard'),set
  const logo=`<img src="${window.SS_LOGO}" alt="Supershores" style="width:210px;max-width:80%;display:block;margin:0 auto 12px">`;
  card.innerHTML=setup?`${logo}<h2>Owner setup</h2><p class="sub">Enter the setup code you were given, then choose your name and a 6 digit password.</p>
   <form autocomplete="off" onsubmit="event.preventDefault();ssSetup();"><div class="form-row"><label>Your full name</label><input type="text" id="aName" autocomplete="name"></div>
-  <div class="form-row"><label>Password (6 digits)</label><input type="password" id="aPass" inputmode="numeric" maxlength="6" autocomplete="new-password"></div>
-  <div class="form-row"><label>Confirm password</label><input type="password" id="aPass2" inputmode="numeric" maxlength="6" autocomplete="new-password"></div>
+  <div class="form-row"><label>Password</label><input type="password" id="aPass" autocomplete="new-password"><p class="helptext">At least 6 characters, with a number and a special character (like @ # ! ?).</p></div>
+  <div class="form-row"><label>Confirm password</label><input type="password" id="aPass2" autocomplete="new-password"></div>
   <div class="form-row"><label>Setup code</label><input type="text" id="aKey" autocapitalize="characters" autocomplete="off"></div>
   <div class="errtext" id="authErr"></div><button type="submit" class="btn gold" style="width:100%;margin-top:14px;">Create owner account</button></form>
   <div class="switchline">Already set up? <a onclick="renderAuthGate('login')">Log in</a></div>`
@@ -50,7 +51,7 @@ submitLogin=async function(){const id=document.getElementById('lId').value.trim(
  catch(e){if(e.code)err.textContent=e.code==='LICENSE_LOCKED'?'This subscription has expired. Ask the owner to renew.':e.message;
   else{if(!users.some(u=>u.id===id)){err.textContent='No connection. Log in online once on this phone first.';return;}await ssOrigLogin();}}};   // offline: the demo's own local check
 submitRegisterAdmin=async function(){const err=document.getElementById('authErr'),name=document.getElementById('aName').value.trim(),p=document.getElementById('aPass').value,p2=document.getElementById('aPass2').value,key=document.getElementById('aKey').value.trim().toUpperCase();
- if(!name||!key){err.textContent='Please fill in your name and the setup code.';return;}if(!/^\d{6}$/.test(p)){err.textContent='Password must be exactly 6 digits.';return;}if(p!==p2){err.textContent='Passwords do not match.';return;}
+ if(!name||!key){err.textContent='Please fill in your name and the setup code.';return;}if(!ssPassRule(p)){err.textContent=ssPassMsg;return;}if(p!==p2){err.textContent='Passwords do not match.';return;}
  try{const d=await SS.api('firstRun',{setupCode:key,name,pin:p});await ssSaveUser(d,p);logActivity('Created the owner account');showIdConfirm(currentUser);}catch(e){err.textContent=e.message;}};
 window.ssSetup=function(){return submitRegisterAdmin();};
 
@@ -68,8 +69,8 @@ resetUserPassword=async function(id){if(!confirm(`Reset the password for ${id}? 
 toggleUserActive=async function(id,active){if(!confirm(`${active?'Deactivate':'Reactivate'} ${id}?${active?' They will no longer be able to log in.':''}`))return;
  try{await SS.api('staff.setActive',{token:currentUser.token,staffId:id,active:!active});logActivity(`${active?'Deactivated':'Reactivated'} ${id}`);renderStaffManagement();}catch(e){alert(e.message);}};
 window.ssChangePass=async function(){if(!navigator.onLine)return alert('Changing your password needs an internet connection.');
- const a=await ssAsk('Change password','',[{label:'Current password'},{label:'New 6 digit password',numeric:true,max:6},{label:'Repeat the new password',numeric:true,max:6}],'Change password');if(!a)return;const[o,n,n2]=a;
- if(!/^\d{6}$/.test(n))return alert('The new password must be exactly 6 digits.');if(n!==n2)return alert('The two new passwords do not match.');
+ const a=await ssAsk('Change password','',[{label:'Current password'},{label:'New password (6+ characters, a number and a special character)'},{label:'Repeat the new password'}],'Change password');if(!a)return;const[o,n,n2]=a;
+ if(!ssPassRule(n))return alert(ssPassMsg);if(n!==n2)return alert('The two new passwords do not match.');
  try{const d=await SS.api('changePasscode',{token:currentUser.token,oldPin:o,newPin:n});await ssSaveUser(d,n);sessionStorage.setItem('ch_current',JSON.stringify(currentUser));logActivity('Changed password');alert('Password changed. Other phones will ask you to log in again.');}catch(e){alert(e.message);}};
 
 /* ---------- Subscription: lock, reminder, renewal ---------- */
@@ -192,10 +193,7 @@ submitLogin=ssBusy(submitLogin,'Signing in...');submitRegisterAdmin=ssBusy(submi
  const $=id=>document.getElementById(id);
  document.addEventListener('keydown',e=>{
   const t=e.target,k=e.key;if(e.isComposing||$('ssAsk'))return;      // the password box handles its own keys
-  const lock=$('lockGate');
-  if(lock&&lock.style.display==='flex'){                              // lock screen: number keys, Backspace, Enter
-   if(/^\d$/.test(k))pinKey(k);else if(k==='Backspace')pinKey('⌫');else if(k==='Enter')pinKey('✓');else return;
-   e.preventDefault();return;}
+    if($('lockGate').style.display==='flex')return;                    // the lock screen has its own password box
   if(k==='Escape'){                                                   // Esc closes the top box
    if($('ssOv')&&!document.body.classList.contains('ss-locked')){ssClose();return;}
    for(const [id,fn] of [['discountAuthOverlay',cancelDiscountAuth],['receiptOverlay',closeReceipt],['reportPrintOverlay',closeReportPrint],['scanOverlay',closeScanner],['tourOverlay',skipTour],['moreSheet',closeMore]]){
@@ -223,9 +221,13 @@ submitLogin=ssBusy(submitLogin,'Signing in...');submitRegisterAdmin=ssBusy(submi
 
 /* ---------- Lock screen uses the 6 digit password (no separate PIN to set per phone) ---------- */
 goToSetPin=function(){if(currentUser&&!currentUser.pinHash){currentUser.pinHash=currentUser.passHash;currentUser.pinSalt=currentUser.passSalt;const i=users.findIndex(u=>u.id===currentUser.id);if(i>=0){users[i]=currentUser;persistUsers();}}enterApp();};
-pinKey=async function(k){const err=document.getElementById('lockErr');if(pinLockedUntil>Date.now())return;
- if(k==='⌫'){enteredPin=enteredPin.slice(0,-1);err.textContent='';renderPinDots();return;}
- if(k==='✓'){await checkPin(err);return;}
- if(enteredPin.length<6){enteredPin+=k;renderPinDots();err.textContent='';}
- if(enteredPin.length===6)await checkPin(err);};
-renderPinDots=function(){document.getElementById('pinDots').innerHTML=[0,1,2,3,4,5].map(i=>`<div class="dot ${i<enteredPin.length?'filled':''}"></div>`).join('');};
+showLockScreen=function(){if(!currentUser)return;enteredPin='';pinLockedUntil=0;
+ document.getElementById('lockWho').textContent=`${currentUser.name} (${currentUser.id}) — enter your password`;
+ document.getElementById('lockGate').style.display='flex';
+ document.getElementById('pinDots').innerHTML='';
+ const np=document.getElementById('numpad');np.style.display='block';
+ np.innerHTML='<form autocomplete="off" onsubmit="event.preventDefault();ssUnlock();"><input type="password" id="lockPass" autocomplete="current-password" placeholder="Password" style="width:100%;padding:12px;border:1.5px solid var(--paper-line);border-radius:9px;font-size:15px;"><button type="submit" class="btn gold" style="width:100%;margin-top:10px;">Unlock</button></form>';
+ setTimeout(()=>{const f=document.getElementById('lockPass');if(f)f.focus();},60);};
+window.ssUnlock=async function(){const f=document.getElementById('lockPass'),err=document.getElementById('lockErr');if(!f||pinLockedUntil>Date.now())return;enteredPin=f.value;await checkPin(err);f.value='';};
+renderPinDots=function(){};
+renderNumpad=function(){const f=document.getElementById('lockPass');if(f){f.disabled=pinLockedUntil>Date.now();if(!f.disabled)f.focus();}};
