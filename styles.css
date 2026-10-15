@@ -78,7 +78,7 @@
   .searchbar input, .searchbar select{ font-family:'IBM Plex Sans'; font-size:13.5px; padding:10px 12px; border:1.5px solid var(--paper-line); border-radius:9px; background:var(--white); color:var(--charcoal); }
   .searchbar input{ flex:1; min-width:160px; }
   input:focus, select:focus{ outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold); }
-
+    button:focus-visible, a:focus-visible, [tabindex]:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
   button.btn{ font-family:'IBM Plex Sans'; font-weight:600; font-size:13px; padding:10px 16px; border-radius:9px; border:1.5px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; transition:transform .1s ease, opacity .15s ease; }
   button.btn:active{ transform:scale(0.97); }
   button.btn.gold{ background:var(--gold); border-color:var(--gold); color:var(--ink); }
