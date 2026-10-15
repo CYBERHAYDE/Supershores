@@ -12,6 +12,15 @@ const ssMoney=n=>'₦'+Number(n||0).toLocaleString('en-NG'),ssRole=r=>r==='owner
 function ssOverlay(html,closable){const old=document.getElementById('ssOv');if(old)old.remove();const d=document.createElement('div');d.className='ssov';d.id='ssOv';d.innerHTML=`<div class="sscard">${html}</div>`;if(closable)d.onclick=e=>{if(e.target===d)ssClose();};document.body.append(d);return d;}
 function ssClose(){const o=document.getElementById('ssOv');if(o)o.remove();if(SS.lic&&SS.lic.locked)ssLock();}   // while expired, closing any box brings the payment wall back
 const ssSay=t=>{const e=document.getElementById('ssMsg');if(e)e.textContent=t;};
+/* Masked input box: use this instead of prompt() whenever a password is typed */
+function ssAsk(title,msg,fields,okLabel){return new Promise(res=>{
+ const d=document.createElement('div');d.className='ssov';d.id='ssAsk';d.style.zIndex=10000;
+ d.innerHTML=`<div class="sscard"><form autocomplete="off"><h3 style="margin-top:0">${esc(title)}</h3><p class="helptext" style="white-space:pre-line">${esc(msg||'')}</p>${fields.map((f,i)=>`<label>${esc(f.label)}</label><input id="ssAskF${i}" type="${f.type||'password'}" ${f.numeric?'inputmode="numeric"':''} ${f.max?`maxlength="${f.max}"`:''} ${f.caps?'autocapitalize="characters"':''} autocomplete="off">`).join('')}<div class="row"><button type="submit" class="btn gold">${esc(okLabel||'Continue')}</button><button type="button" class="btn ghost" id="ssAskNo">Cancel</button></div></form></div>`;
+ const done=v=>{d.remove();res(v);};
+ d.querySelector('form').onsubmit=e=>{e.preventDefault();const v=fields.map((f,i)=>d.querySelector('#ssAskF'+i).value);if(v.some(x=>!x))return;done(v);};
+ d.querySelector('#ssAskNo').onclick=()=>done(null);
+ d.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();done(null);}});
+ document.body.append(d);d.querySelector('input').focus();});}
 
 /* ---------- Sign-in (server) ---------- */
 async function ssSaveUser(d,pass){const salt=randomSaltHex(),old=users.find(u=>u.id===d.user.id);
@@ -32,7 +41,8 @@ renderAuthGate=function(view){const card=document.getElementById('authCard'),set
   <div class="form-row"><label>Password</label><input type="password" id="lPass" autocomplete="current-password"></div>
   <div class="errtext" id="authErr"></div><button type="submit" class="btn gold" style="width:100%;margin-top:14px;">Log in</button></form>
   <div class="switchline">First time setup? <a onclick="renderAuthGate('setup')">Owner setup</a></div>`;
- document.getElementById('authGate').style.visibility='visible';};
+ document.getElementById('authGate').style.visibility='visible';
+ if(matchMedia('(hover:hover)').matches)setTimeout(()=>{const f=document.getElementById(setup?'aName':'lId');if(f)f.focus();},60);};
 const ssOrigLogin=submitLogin;
 submitLogin=async function(){const id=document.getElementById('lId').value.trim().toUpperCase(),pass=document.getElementById('lPass').value,err=document.getElementById('authErr');
  if(!id||!pass){err.textContent='Enter your staff ID and password.';return;}
@@ -58,7 +68,7 @@ resetUserPassword=async function(id){if(!confirm(`Reset the password for ${id}? 
 toggleUserActive=async function(id,active){if(!confirm(`${active?'Deactivate':'Reactivate'} ${id}?${active?' They will no longer be able to log in.':''}`))return;
  try{await SS.api('staff.setActive',{token:currentUser.token,staffId:id,active:!active});logActivity(`${active?'Deactivated':'Reactivated'} ${id}`);renderStaffManagement();}catch(e){alert(e.message);}};
 window.ssChangePass=async function(){if(!navigator.onLine)return alert('Changing your password needs an internet connection.');
- const o=prompt('Current password:'),n=o&&prompt('New 6 digit password:'),n2=n&&prompt('Repeat the new password:');if(!o||!n||!n2)return;
+ const a=await ssAsk('Change password','',[{label:'Current password'},{label:'New 6 digit password',numeric:true,max:6},{label:'Repeat the new password',numeric:true,max:6}],'Change password');if(!a)return;const[o,n,n2]=a;
  if(!/^\d{6}$/.test(n))return alert('The new password must be exactly 6 digits.');if(n!==n2)return alert('The two new passwords do not match.');
  try{const d=await SS.api('changePasscode',{token:currentUser.token,oldPin:o,newPin:n});await ssSaveUser(d,n);sessionStorage.setItem('ch_current',JSON.stringify(currentUser));logActivity('Changed password');alert('Password changed. Other phones will ask you to log in again.');}catch(e){alert(e.message);}};
 
@@ -160,8 +170,8 @@ window.ssTplSample=function(){const txt=`<!-- Receipt template. Edit the layout 
 
 /* ---------- Reset inventory data (first admin only) ---------- */
 window.ssResetData=async function(){if(currentUser.id!=='AD-001')return alert('Only the first admin can reset the data.');if(!navigator.onLine)return alert('A reset needs an internet connection.');
- const pw=prompt('This erases ALL items, stock, sales, expenses and customers for this business, on every phone. A backup copy is saved first.\n\nEnter your password to continue:');if(!pw)return;
- if(prompt('Type RESET to confirm.')!=='RESET')return alert('Reset cancelled. Nothing was erased.');
+  const a=await ssAsk('Reset inventory data','This erases ALL items, stock, sales, expenses and customers for this business, on every phone. A backup copy is saved first.',[{label:'Your password'},{label:'Type RESET to confirm',type:'text',caps:true}],'Erase everything');if(!a)return;const pw=a[0];
+ if(a[1].trim()!=='RESET')return alert('Reset cancelled. Nothing was erased.');
  try{const r=await SS.api('data.reset',{token:currentUser.token,pin:pw,confirm:'RESET'});SY.wipeLocal(r.epoch);logActivity('Reset all inventory data');alert('All inventory data was erased. A backup copy of the Sheet was saved first.');}catch(e){alert(e.message);}};
 function ssInjectPanels(){const sc=document.getElementById('settingsContent');if(!sc)return;
  if(!document.getElementById('ssPanels'))sc.insertAdjacentHTML('beforeend',`<div id="ssPanels"><div class="panel"><h3>Receipt template</h3><p class="helptext">Upload your own receipt layout as an .html file. Use placeholders like {{business_name}}, {{items}} and {{total}}. <a onclick="ssTplSample()" style="cursor:pointer;text-decoration:underline">Download a sample</a> to start from.</p>
@@ -176,3 +186,37 @@ function ssBusy(fn,label){return async function(...a){const btn=document.querySe
  try{return await fn.apply(this,a);}finally{if(btn&&document.body.contains(btn)){btn.disabled=false;btn.textContent=t;}}};}
 submitLogin=ssBusy(submitLogin,'Signing in...');submitRegisterAdmin=ssBusy(submitRegisterAdmin,'Creating account...');
 {const sp=document.getElementById('ssSplash');if(sp){sp.style.transition='opacity .25s';sp.style.opacity='0';setTimeout(()=>sp.remove(),260);}}
+
+/* ---------- Keyboard support ---------- */
+(function(){
+ const $=id=>document.getElementById(id);
+ document.addEventListener('keydown',e=>{
+  const t=e.target,k=e.key;if(e.isComposing||$('ssAsk'))return;      // the password box handles its own keys
+  const lock=$('lockGate');
+  if(lock&&lock.style.display==='flex'){                              // lock screen: number keys, Backspace, Enter
+   if(/^\d$/.test(k))pinKey(k);else if(k==='Backspace')pinKey('⌫');else if(k==='Enter')pinKey('✓');else return;
+   e.preventDefault();return;}
+  if(k==='Escape'){                                                   // Esc closes the top box
+   if($('ssOv')&&!document.body.classList.contains('ss-locked')){ssClose();return;}
+   for(const [id,fn] of [['discountAuthOverlay',cancelDiscountAuth],['receiptOverlay',closeReceipt],['reportPrintOverlay',closeReportPrint],['scanOverlay',closeScanner],['tourOverlay',skipTour],['moreSheet',closeMore]]){
+    const o=$(id);if(o&&o.classList.contains('active')){fn();return;}}
+   return;}
+  if(k!=='Enter'&&k!==' ')return;
+  if((k==='Enter'||k===' ')&&t.matches&&t.matches('a[onclick]')){e.preventDefault();t.click();return;}
+  if(k!=='Enter'||t.tagName!=='INPUT'||['checkbox','radio','file','button'].includes(t.type)||t.closest('form'))return;
+  if(t.id==='saleSearch'){                                            // scanner gun or keyboard: Enter adds the item
+   e.preventDefault();const q=t.value.trim(),ql=q.toLowerCase();if(!q)return;
+   let m=items.find(i=>i.barcode&&i.barcode===q);
+   if(!m){const r=items.filter(i=>i.name.toLowerCase().includes(ql)||(i.barcode||'').includes(q));if(r.length===1)m=r[0];}
+   if(!m)return;
+   if(itemAvailable(m)<1)return alert(m.name+' is out of stock.');
+   addToCart(m.id);t.value='';renderSaleSearch();t.focus();return;}
+  let fn={newExpenseAmount:submitExpense,newExpenseNote:submitExpense,newBranchName:addBranch,bundleComponentQty:addBundleComponent}[t.id];
+  if(!fn&&t.closest('#addBox'))fn=submitNewItem;
+  if(!fn&&t.closest('#addDebtorBox'))fn=submitNewDebtor;
+  if(!fn&&t.closest('#discountBox'))fn=requestDiscount;
+  if(fn){e.preventDefault();fn();}
+ });
+ const tab=()=>document.querySelectorAll('a[onclick]:not([tabindex])').forEach(a=>{a.tabIndex=0;a.setAttribute('role','button');});
+ tab();new MutationObserver(tab).observe(document.body,{childList:true,subtree:true});
+})();
