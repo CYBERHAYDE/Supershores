@@ -374,7 +374,7 @@ function applyRoleLocks(){
   document.getElementById('closedayContent').style.display = isStaff?'none':'block';
   document.getElementById('settingsLocked').style.display = isStaff?'block':'none';
   document.getElementById('settingsContent').style.display = isStaff?'none':'block';
-  document.getElementById('costFieldWrap').style.display = isStaff?'none':'block';
+    document.getElementById('costFieldWrap').style.display = (isStaff && !can('items'))?'none':'block';
   document.getElementById('staffCostNote').style.display = isStaff?'block':'none';
   document.getElementById('importBtn').style.display = isStaff?'none':'inline-flex';
   const activeTab = document.querySelector('nav.tabs button.active').dataset.view;
@@ -603,7 +603,7 @@ function saveEditItem(id){
   editingItemId = null;
   renderAll();
 }
-function toggleAddBox(){ const box=document.getElementById('addBox'); box.classList.toggle('open'); if(box.classList.contains('open')) applyRoleLocks(); }
+function toggleAddBox(){ if(!can('items')){ alert('You do not have access to add products. Ask the admin.'); return; } const box=document.getElementById('addBox'); box.classList.toggle('open'); if(box.classList.contains('open')) applyRoleLocks(); }
 let pendingPhoto = null;
 /* Product photos are stored as base64 inside localStorage, which has a hard ~5-10MB
    quota shared by the whole app — a handful of full-resolution phone photos fills
@@ -819,7 +819,7 @@ function submitNewItem(){
   const isBundle = !isService && document.getElementById('newIsBundle').checked;
   const stock = (isBundle||isService) ? 0 : (Number(document.getElementById('newStock').value) || 0);
   const reorder = isService ? 0 : (Number(document.getElementById('newReorder').value) || 5);
-  const cost = role()==='admin' ? Number(document.getElementById('newCost').value) : null;
+    const cost = can('items') ? Number(document.getElementById('newCost').value) : null;
   const supplier = document.getElementById('newSupplier').value.trim();
   const expiry = document.getElementById('newExpiry').value || null;
   const branch = document.getElementById('newBranch').value || null;
