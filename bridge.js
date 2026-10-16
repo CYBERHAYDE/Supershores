@@ -4,7 +4,7 @@ const SS={API:'https://script.google.com/macros/s/AKfycbyR4tyWCQ7OVLSfhe3UUr2vsZ
 SS.api=async(action,body={})=>{const r=await fetch(SS.API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...body})});
  const j=await r.json();if(!j.ok){const e=new Error(j.error);e.code=j.code;throw e;}return j.data;};
 /* Loading feedback: a thin bar at the top while something the person tapped is waiting on the server */
-{const FG=['login','firstRun','staff.list','staff.add','staff.resetPasscode','staff.setActive','changePasscode','authorizeDiscount','payment.submit','data.reset','registerDevice'],raw=SS.api;let pend=0,tm;
+{const FG=['login','firstRun','staff.list','staff.add','staff.resetPasscode','staff.setActive','staff.update','staff.delete','changePasscode','authorizeDiscount','payment.submit','data.reset','registerDevice'],raw=SS.api;let pend=0,tm;
  SS.api=async(action,body)=>{const fg=FG.includes(action),bar=document.getElementById('ssTopBar');if(fg){pend++;clearTimeout(tm);tm=setTimeout(()=>{if(pend&&bar)bar.classList.add('on');},200);}
   try{return await raw(action,body);}finally{if(fg){pend--;if(!pend){clearTimeout(tm);if(bar)bar.classList.remove('on');}}}};}
 const ssGet=(k,d)=>{try{const v=JSON.parse(SSLS.getItem(k));return v===null?d:v;}catch(e){return d;}},ssSet=(k,v)=>SSLS.setItem(k,JSON.stringify(v));
@@ -16,7 +16,7 @@ const ssPassRule=p=>p.length>=6&&p.length<=64&&/\d/.test(p)&&/[^A-Za-z0-9\s]/.te
 /* Masked input box: use this instead of prompt() whenever a password is typed */
 function ssAsk(title,msg,fields,okLabel){return new Promise(res=>{
  const d=document.createElement('div');d.className='ssov';d.id='ssAsk';d.style.zIndex=10000;
- d.innerHTML=`<div class="sscard"><form autocomplete="off"><h3 style="margin-top:0">${esc(title)}</h3><p class="helptext" style="white-space:pre-line">${esc(msg||'')}</p>${fields.map((f,i)=>`<label>${esc(f.label)}</label><input id="ssAskF${i}" type="${f.type||'password'}" ${f.numeric?'inputmode="numeric"':''} ${f.max?`maxlength="${f.max}"`:''} ${f.caps?'autocapitalize="characters"':''} autocomplete="off">`).join('')}<div class="row"><button type="submit" class="btn gold">${esc(okLabel||'Continue')}</button><button type="button" class="btn ghost" id="ssAskNo">Cancel</button></div></form></div>`;
+ d.innerHTML=`<div class="sscard"><form autocomplete="off"><h3 style="margin-top:0">${esc(title)}</h3><p class="helptext" style="white-space:pre-line">${esc(msg||'')}</p>${fields.map((f,i)=>`<label>${esc(f.label)}</label><input id="ssAskF${i}" type="${f.type||'password'}" ${f.numeric?'inputmode="numeric"':''} ${f.max?`maxlength="${f.max}"`:''} ${f.caps?'autocapitalize="characters"':''} ${f.value!==undefined?`value="${esc(f.value)}"`:''} autocomplete="off">`).join('')}<div class="row"><button type="submit" class="btn gold">${esc(okLabel||'Continue')}</button><button type="button" class="btn ghost" id="ssAskNo">Cancel</button></div></form></div>`;
  const done=v=>{d.remove();res(v);};
  d.querySelector('form').onsubmit=e=>{e.preventDefault();const v=fields.map((f,i)=>d.querySelector('#ssAskF'+i).value);if(v.some(x=>!x))return;done(v);};
  d.querySelector('#ssAskNo').onclick=()=>done(null);
@@ -58,12 +58,20 @@ window.ssSetup=function(){return submitRegisterAdmin();};
 /* ---------- Staff (server) ---------- */
 renderStaffManagement=async function(){if(role()!=='admin')return;const body=document.getElementById('staffMgmtBody');if(!body)return;
  let list;try{list=await SS.api('staff.list',{token:currentUser.token});}catch(e){body.innerHTML=`<tr><td colspan="5" style="color:var(--muted);">${esc(e.message)} Staff management needs an internet connection.</td></tr>`;return;}
- body.innerHTML=list.map(u=>{const self=u.id===currentUser.id,rb=ssRole(u.role),pill=u.active?`<span class="pill ok">${t('activeStatus')}</span>`:`<span class="pill low">${t('inactiveStatus')}</span>`,
+ window.ssStaffList=list;body.innerHTML=list.map(u=>{const self=u.id===currentUser.id,rb=ssRole(u.role),pill=u.active?`<span class="pill ok">${t('activeStatus')}</span>`:`<span class="pill low">${t('inactiveStatus')}</span>`,
   tog=self?'<span class="helptext">(you)</span>':`<button class="btn sm ghost" onclick="toggleUserActive('${u.id}',${u.active})">${u.active?t('deactivateBtn'):t('reactivateBtn')}</button>`;
-  return `<tr><td class="mono">${esc(u.id)}</td><td>${esc(u.name)}</td><td><span class="rolebadge ${rb}">${rb}</span></td><td>${pill}</td><td style="white-space:nowrap;"><button class="btn sm ghost" onclick="resetUserPassword('${u.id}')">${t('resetPasswordBtn')}</button> ${tog}</td></tr>`;}).join('')
+  return `<tr><td class="mono">${esc(u.id)}</td><td>${esc(u.name)}</td><td><span class="rolebadge ${rb}">${rb}</span></td><td>${pill}</td><td style="white-space:nowrap;"><button class="btn sm ghost" onclick="ssEditStaff('${u.id}')">Edit</button> <button class="btn sm ghost" onclick="resetUserPassword('${u.id}')">${t('resetPasswordBtn')}</button> ${tog} ${self||u.id==='AD-001'?'':`<button class="btn sm ghost" style="color:#b3261e" onclick="ssDeleteStaff('${u.id}')">Delete</button>`}</td></tr>`;}).join('')
   +`<tr><td colspan="5"><div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="ssNewStaff" placeholder="New team member's full name" style="flex:1;min-width:200px;">${currentUser.id==='AD-001'?'<select id="ssNewRole"><option value="staff">Staff</option><option value="owner">Admin</option></select>':''}<button class="btn sm gold" onclick="ssAddStaff()">Add staff member</button></div></td></tr>`;};
 window.ssAddStaff=async function(){const n=document.getElementById('ssNewStaff').value.trim();if(!n)return alert('Type the staff member\'s full name first.');
  try{const rl=(document.getElementById('ssNewRole')||{value:'staff'}).value,r=await SS.api('staff.add',{token:currentUser.token,name:n,role:rl});logActivity(`Added ${rl==='owner'?'admin':'staff'} ${n} (${r.id})`);alert(`${rl==='owner'?'Admin':'Staff'} ID: ${r.id}\nTemporary password: ${r.passcode}\n\nGive these to them in person. The password is shown only once.`);renderStaffManagement();}catch(e){alert(e.message);}};
+window.ssEditStaff=async function(id){const u=(window.ssStaffList||[]).find(x=>x.id===id);if(!u)return;
+ const a=await ssAsk('Edit '+id,'Change the name. Use Reset password for the password.',[{label:'Full name',type:'text',value:u.name,max:60}],'Save');if(!a)return;
+ const ch={name:a[0].trim()};
+ if(currentUser.id==='AD-001'&&id!=='AD-001'){const nr=confirm(`Make ${a[0].trim()} ${u.role==='owner'?'a regular staff member':'an admin'}?\n\nPress OK to change the role, or Cancel to keep it.`);if(nr)ch.role=u.role==='owner'?'staff':'owner';}
+ try{await SS.api('staff.update',{token:currentUser.token,staffId:id,changes:ch});logActivity(`Edited staff ${id}`);renderStaffManagement();}catch(e){alert(e.message);}};
+window.ssDeleteStaff=async function(id){const u=(window.ssStaffList||[]).find(x=>x.id===id);if(!u)return;
+ if(!confirm(`Delete ${u.name} (${id})?\n\nThey will be signed out and removed from this list. Their past sales keep their name.\n\nThis cannot be undone.`))return;
+ try{await SS.api('staff.delete',{token:currentUser.token,staffId:id});logActivity(`Removed account ${id}`);renderStaffManagement();}catch(e){alert(e.message);}};
 resetUserPassword=async function(id){if(!confirm(`Reset the password for ${id}? A new temporary password will be generated.`))return;
  try{const r=await SS.api('staff.resetPasscode',{token:currentUser.token,staffId:id});logActivity('Reset password for '+id);alert(`New temporary password for ${id}:\n\n${r.passcode}\n\nShared once. They should change it after logging in.`);}catch(e){alert(e.message);}};
 toggleUserActive=async function(id,active){if(!confirm(`${active?'Deactivate':'Reactivate'} ${id}?${active?' They will no longer be able to log in.':''}`))return;
