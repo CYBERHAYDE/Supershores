@@ -365,7 +365,7 @@ function applyRoleLocks(){
   ['tabReports','tabActivity','tabCloseday','tabSettings','tabExpenses'].forEach(id=>document.getElementById(id).dataset.locked = isStaff?'1':'0');
   ['moreReports','moreActivity','moreCloseday','moreSettings','moreExpenses'].forEach(id=>document.getElementById(id).dataset.locked = isStaff?'1':'0');
     const noExp = isStaff && !can('expenses');   ['tabExpenses','moreExpenses'].forEach(id=>document.getElementById(id).dataset.locked = noExp?'1':'0');   const sellTab=document.querySelector('#tabs [data-view="sale"]'); if(sellTab) sellTab.dataset.locked = can('sell')?'0':'1';   document.getElementById('tabDebtors').dataset.locked = can('debtors')?'0':'1';   document.getElementById('expensesLocked').style.display = noExp?'block':'none';
-  document.getElementById('expensesContent').style.display = noExp?'none':'block'
+  document.getElementById('expensesContent').style.display = noExp?'none':'block';
   document.getElementById('reportsLocked').style.display = isStaff?'block':'none';
   document.getElementById('reportsContent').style.display = isStaff?'none':'block';
   document.getElementById('activityLocked').style.display = isStaff?'block':'none';
@@ -375,10 +375,10 @@ function applyRoleLocks(){
   document.getElementById('settingsLocked').style.display = isStaff?'block':'none';
   document.getElementById('settingsContent').style.display = isStaff?'none':'block';
     document.getElementById('costFieldWrap').style.display = (isStaff && !can('items'))?'none':'block';
-  document.getElementById('staffCostNote').style.display = isStaff?'block':'none';
+  document.getElementById('staffCostNote').style.display = (isStaff && !can('items'))'block':'none';
   document.getElementById('importBtn').style.display = isStaff?'none':'inline-flex';
   const activeTab = document.querySelector('nav.tabs button.active').dataset.view;
-  if(isStaff && ['reports','activity','closeday','settings','expenses'].includes(activeTab)) switchView('dashboard');
+    if(isStaff && (['reports','activity','closeday','settings'].includes(activeTab) || (activeTab==='expenses'&&!can('expenses')) || (activeTab==='sale'&&!can('sell')) || (activeTab==='debtors'&&!can('debtors')))) switchView('dashboard');
 }
 
 /* ================= Dashboard ================= */
@@ -486,7 +486,7 @@ function renderInventory(){
     // price, which is one of the fraud-prevention rules this app is built around.
     const actionBtns = isAdmin
       ? `<button class="btn sm ghost" onclick="startEditItem(${i.id})" title="${t('editTitle')}">✎ ${t('editBtn')}</button> ${(i.bundle||i.service)?'':`<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`}`
-      ((i.bundle||i.service||!can('stock')) ? '' : `<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`);
+      : ((i.bundle||i.service||!can('stock')) ? '' : `<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`);
     return isAdmin
       ? `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${displayStock} ${esc(i.unit)}</td><td>${costCell}</td><td class="mono">${naira(i.price)}</td><td class="mono">${margin}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`
       : `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${displayStock} ${esc(i.unit)}</td><td class="mono">${naira(i.price)}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`;
@@ -846,7 +846,7 @@ function renderSaleSearch(){
   const q = document.getElementById('saleSearch').value.toLowerCase();
   const results = q.length===0 ? [] : items.filter(i=>i.name.toLowerCase().includes(q) || (i.barcode||'').includes(q)).slice(0,6);
   document.getElementById('saleSearchResults').innerHTML = results.map(i=>`
-    <div class="add-row"><div class="left">${photoCell(i)}<div class="info"><b>${esc(i.name)}</b><br><span class="stock">${itemAvailable(i)} ${esc(i.unit)} in stock · ${naira(i.price)}</span></div></div>
+    <div class="add-row"><div class="left">${photoCell(i)}<div class="info"><b>${esc(i.name)}</b><br><span class="stock">${i.service ? 'Service' : itemAvailable(i)+' '+esc(i.unit)+' in stock'} · ${naira(i.price)}</span></div></div>
     <button class="btn sm gold" onclick="addToCart(${i.id})" ${itemAvailable(i)<1?'disabled':''}>Add</button></div>`).join('')
     || (q ? `<p class="helptext">No matches.</p>` : `<p class="helptext">Start typing to find an item…</p>`);
 }
