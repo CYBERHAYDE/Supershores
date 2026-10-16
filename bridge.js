@@ -4,7 +4,7 @@ const SS={API:'https://script.google.com/macros/s/AKfycbyR4tyWCQ7OVLSfhe3UUr2vsZ
 SS.api=async(action,body={})=>{const r=await fetch(SS.API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...body})});
  const j=await r.json();if(!j.ok){const e=new Error(j.error);e.code=j.code;throw e;}return j.data;};
 /* Loading feedback: a thin bar at the top while something the person tapped is waiting on the server */
-{const FG=['login','firstRun','staff.list','staff.add','staff.resetPasscode','staff.setActive','staff.update','staff.delete','changePasscode','authorizeDiscount','payment.submit','data.reset','registerDevice'],raw=SS.api;let pend=0,tm;
+{const FG=['login','firstRun','staff.list','staff.add','staff.resetPasscode','staff.setActive','staff.update','staff.delete','staff.setPerms','changePasscode','authorizeDiscount','payment.submit','data.reset','registerDevice'],raw=SS.api;let pend=0,tm;
  SS.api=async(action,body)=>{const fg=FG.includes(action),bar=document.getElementById('ssTopBar');if(fg){pend++;clearTimeout(tm);tm=setTimeout(()=>{if(pend&&bar)bar.classList.add('on');},200);}
   try{return await raw(action,body);}finally{if(fg){pend--;if(!pend){clearTimeout(tm);if(bar)bar.classList.remove('on');}}}};}
 const ssGet=(k,d)=>{try{const v=JSON.parse(SSLS.getItem(k));return v===null?d:v;}catch(e){return d;}},ssSet=(k,v)=>SSLS.setItem(k,JSON.stringify(v));
@@ -25,7 +25,7 @@ function ssAsk(title,msg,fields,okLabel){return new Promise(res=>{
 
 /* ---------- Sign-in (server) ---------- */
 async function ssSaveUser(d,pass){const salt=randomSaltHex(),ph=await hashSecret(pass,salt);
- const rec={id:d.user.id,name:d.user.name,role:ssRole(d.user.role),passSalt:salt,passHash:ph,pinHash:ph,pinSalt:salt,active:true,token:d.token};
+ const rec={id:d.user.id,name:d.user.name,role:ssRole(d.user.role),passSalt:salt,passHash:ph,pinHash:ph,pinSalt:salt,active:true,token:d.token,perms:d.user.perms};
  const i=users.findIndex(u=>u.id===rec.id);i<0?users.push(rec):users[i]=rec;persistUsers();currentUser=rec;
  ssSet('ss_lic',d.subscription?Object.assign(ssGet('ss_lic',{}),{status:d.subscription.status}):ssGet('ss_lic',{}));}
 renderAuthGate=function(view){const card=document.getElementById('authCard'),setup=view==='setup'||view==='registerAdmin';
@@ -58,12 +58,19 @@ window.ssSetup=function(){return submitRegisterAdmin();};
 /* ---------- Staff (server) ---------- */
 renderStaffManagement=async function(){if(role()!=='admin')return;const body=document.getElementById('staffMgmtBody');if(!body)return;
  let list;try{list=await SS.api('staff.list',{token:currentUser.token});}catch(e){body.innerHTML=`<tr><td colspan="5" style="color:var(--muted);">${esc(e.message)} Staff management needs an internet connection.</td></tr>`;return;}
- window.ssStaffList=list;body.innerHTML=list.map(u=>{const self=u.id===currentUser.id,rb=ssRole(u.role),pill=u.active?`<span class="pill ok">${t('activeStatus')}</span>`:`<span class="pill low">${t('inactiveStatus')}</span>`,
+ window.ssStaffList=list;body.innerHTML=list.filter(u=>ssRole(u.role)!=='admin'||u.id===currentUser.id||currentUser.id==='AD-001').map(u=>{const self=u.id===currentUser.id,rb=ssRole(u.role),pill=u.active?`<span class="pill ok">${t('activeStatus')}</span>`:`<span class="pill low">${t('inactiveStatus')}</span>`,
   tog=self?'<span class="helptext">(you)</span>':`<button class="btn sm ghost" onclick="toggleUserActive('${u.id}',${u.active})">${u.active?t('deactivateBtn'):t('reactivateBtn')}</button>`;
-  return `<tr><td class="mono">${esc(u.id)}</td><td>${esc(u.name)}</td><td><span class="rolebadge ${rb}">${rb}</span></td><td>${pill}</td><td style="white-space:nowrap;"><button class="btn sm ghost" onclick="ssEditStaff('${u.id}')">Edit</button> <button class="btn sm ghost" onclick="resetUserPassword('${u.id}')">${t('resetPasswordBtn')}</button> ${tog} ${self||u.id==='AD-001'?'':`<button class="btn sm ghost" style="color:#b3261e" onclick="ssDeleteStaff('${u.id}')">Delete</button>`}</td></tr>`;}).join('')
+  return `<tr><td class="mono">${esc(u.id)}</td><td>${esc(u.name)}</td><td><span class="rolebadge ${rb}">${rb}</span></td><td>${pill}</td><td style="white-space:nowrap;"><button class="btn sm ghost" onclick="ssEditStaff('${u.id}')">Edit</button>  ${rb==='admin'?'':`<button class="btn sm ghost" onclick="ssEditAccess('${u.id}')">Access</button>`} <button class="btn sm ghost" onclick="resetUserPassword('${u.id}')">${t('resetPasswordBtn')}</button> ${tog} ${self||u.id==='AD-001'?'':`<button class="btn sm ghost" style="color:#b3261e" onclick="ssDeleteStaff('${u.id}')">Delete</button>`}</td></tr>`;}).join('')
   +`<tr><td colspan="5"><div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="ssNewStaff" placeholder="New team member's full name" style="flex:1;min-width:200px;">${currentUser.id==='AD-001'?'<select id="ssNewRole"><option value="staff">Staff</option><option value="owner">Admin</option></select>':''}<button class="btn sm gold" onclick="ssAddStaff()">Add staff member</button></div></td></tr>`;};
 window.ssAddStaff=async function(){const n=document.getElementById('ssNewStaff').value.trim();if(!n)return alert('Type the staff member\'s full name first.');
  try{const rl=(document.getElementById('ssNewRole')||{value:'staff'}).value,r=await SS.api('staff.add',{token:currentUser.token,name:n,role:rl});logActivity(`Added ${rl==='owner'?'admin':'staff'} ${n} (${r.id})`);alert(`${rl==='owner'?'Admin':'Staff'} ID: ${r.id}\nTemporary password: ${r.passcode}\n\nGive these to them in person. The password is shown only once.`);renderStaffManagement();}catch(e){alert(e.message);}};
+window.ssEditAccess=function(id){const u=(window.ssStaffList||[]).find(x=>x.id===id);if(!u)return;
+ const L=[['sell','Register sales'],['stock','Restock and stock out'],['debtors','Customers and credit'],['expenses','Record expenses']],cur=u.perms||['sell','stock','debtors'];
+ const d=document.createElement('div');d.className='ssov';d.style.zIndex=10000;
+ d.innerHTML=`<div class="sscard"><form><h3 style="margin-top:0">Access for ${esc(u.name)}</h3><p class="helptext">Tick what this person may do. It takes effect the next time their phone syncs.</p>${L.map(([k,l])=>`<label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" data-k="${k}" style="width:auto" ${cur.includes(k)?'checked':''}> ${l}</label>`).join('')}<div class="row"><button type="submit" class="btn gold">Save</button><button type="button" class="btn ghost" id="ssPermNo">Cancel</button></div></form></div>`;
+ document.body.appendChild(d);d.querySelector('#ssPermNo').onclick=()=>d.remove();
+ d.querySelector('form').onsubmit=async e=>{e.preventDefault();const perms=[...d.querySelectorAll('input[data-k]')].filter(x=>x.checked).map(x=>x.dataset.k);
+  try{await SS.api('staff.setPerms',{token:currentUser.token,staffId:id,perms});logActivity(`Edited staff ${id}`);d.remove();renderStaffManagement();}catch(er){alert(er.message);}};};
 window.ssEditStaff=async function(id){const u=(window.ssStaffList||[]).find(x=>x.id===id);if(!u)return;
  const a=await ssAsk('Edit '+id,'Change the name. Use Reset password for the password.',[{label:'Full name',type:'text',value:u.name,max:60}],'Save');if(!a)return;
  const ch={name:a[0].trim()};
