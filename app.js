@@ -359,12 +359,13 @@ function closeMore(){ document.getElementById('moreSheet').classList.remove('act
 function fromMore(view){ closeMore(); if(document.getElementById('more'+view.charAt(0).toUpperCase()+view.slice(1)).dataset.locked==='1') return; switchView(view); }
 
 function role(){ return currentUser ? currentUser.role : 'staff'; }
+function can(k){ if(role()==='admin') return true; const p=(currentUser&&currentUser.perms)||['sell','stock','debtors']; return p.indexOf(k)>=0; }
 function applyRoleLocks(){
   const isStaff = role()==='staff';
   ['tabReports','tabActivity','tabCloseday','tabSettings','tabExpenses'].forEach(id=>document.getElementById(id).dataset.locked = isStaff?'1':'0');
   ['moreReports','moreActivity','moreCloseday','moreSettings','moreExpenses'].forEach(id=>document.getElementById(id).dataset.locked = isStaff?'1':'0');
-  document.getElementById('expensesLocked').style.display = isStaff?'block':'none';
-  document.getElementById('expensesContent').style.display = isStaff?'none':'block';
+    const noExp = isStaff && !can('expenses');   ['tabExpenses','moreExpenses'].forEach(id=>document.getElementById(id).dataset.locked = noExp?'1':'0');   const sellTab=document.querySelector('#tabs [data-view="sale"]'); if(sellTab) sellTab.dataset.locked = can('sell')?'0':'1';   document.getElementById('tabDebtors').dataset.locked = can('debtors')?'0':'1';   document.getElementById('expensesLocked').style.display = noExp?'block':'none';
+  document.getElementById('expensesContent').style.display = noExp?'none':'block'
   document.getElementById('reportsLocked').style.display = isStaff?'block':'none';
   document.getElementById('reportsContent').style.display = isStaff?'none':'block';
   document.getElementById('activityLocked').style.display = isStaff?'block':'none';
@@ -485,7 +486,7 @@ function renderInventory(){
     // price, which is one of the fraud-prevention rules this app is built around.
     const actionBtns = isAdmin
       ? `<button class="btn sm ghost" onclick="startEditItem(${i.id})" title="${t('editTitle')}">✎ ${t('editBtn')}</button> ${(i.bundle||i.service)?'':`<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`}`
-      : ((i.bundle||i.service) ? '' : `<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`);
+      ((i.bundle||i.service||!can('stock')) ? '' : `<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`);
     return isAdmin
       ? `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${displayStock} ${esc(i.unit)}</td><td>${costCell}</td><td class="mono">${naira(i.price)}</td><td class="mono">${margin}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`
       : `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${displayStock} ${esc(i.unit)}</td><td class="mono">${naira(i.price)}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`;
@@ -1298,7 +1299,7 @@ function submitExpense(){
   renderExpenses(); renderReports();
 }
 function renderExpenses(){
-  if(role()!=='admin') return;
+  if(!can('expenses')) return;
   document.getElementById('expensesBody').innerHTML = expenses.slice().reverse().map(e=>`
     <tr><td>${esc(e.isoDate)}</td><td>${esc(e.category)}</td><td class="mono">${naira(e.amount)}</td><td>${esc(e.loggedBy)}</td><td>${esc(e.note||'—')}</td>
     <td><button class="btn sm ghost" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')
