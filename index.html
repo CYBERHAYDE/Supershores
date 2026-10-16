@@ -132,6 +132,9 @@ button[disabled]{cursor:progress}@media(prefers-reduced-motion:reduce){.ssspin,#
           <input type="file" accept="image/*" id="newPhoto" onchange="previewPhoto()">
         </div>
       </div>
+            <div class="form-row">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="newIsService" onchange="toggleServiceMode()" style="width:auto;"> <span>This is a service (no stock to count, e.g. repairs, delivery, installation)</span></label>
+      </div>
       <div class="form-row">
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="newIsBundle" onchange="toggleBundleBuilder()" style="width:auto;"> <span data-i18n="bundleCheckboxLabel">This is a bundle of other products (a combo pack)</span></label>
         <div id="bundleBuilder" style="display:none; margin-top:10px; padding:12px; background:var(--paper); border-radius:9px;">
