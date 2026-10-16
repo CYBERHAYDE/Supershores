@@ -55,8 +55,8 @@ logActivity=function(a){syLog(a);if(!SY.merging&&currentUser&&!COVERED.test(a))S
 SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.locked))return;clearTimeout(SY.dt);SY.diff();   // process any change that has not been looked at yet, so a refresh can never skip it
  SY.busy=true;SY.chip('Syncing...');
  try{let q=syQ();q.forEach(o=>{if(o.by===currentUser.id)o.token=currentUser.token;});
-  syQSave(q);const sendable=q.filter(o=>o.type!=='__photo');
-  if(sendable.length){const d=await SS.api('push',{ops:sendable.map(({by,...o})=>o)}),bad=ssGet('ss_failed',[]);
+  syQSave(q);const n0=q.length;const sendable=q.filter(o=>o.type!=='__photo');
+  if(sendable.length){const d=await SS.api('push',{ops:sendable.slice(0,50).map(({by,...o})=>o)}),bad=ssGet('ss_failed',[]);
    d.results.forEach(r=>{const o=q.find(x=>x.opId===r.opId);if(!o)return;
     if(r.status==='ok'||r.status==='duplicate'){q=q.filter(x=>x!==o);if(r.status==='ok'&&o.type==='sale.create')SY.fixSale(o,r.result);}
     else if(r.status==='error'){o.tries=(o.tries||0)+1;if(o.tries>=5){q=q.filter(x=>x!==o);bad.push({type:o.type,error:'The server could not process this after several tries.',id:o.payload.saleId||o.payload.itemId||o.payload.customerId||''});}}
@@ -66,7 +66,7 @@ SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.l
    if(small)try{const r=await SS.api('photo.put',{token:currentUser.token,itemId:o.payload.itemId,dataUrl:small});if(o.payload.logo){settings.logoVer=r.marker;settings.logoHave=r.marker;persistSettings();}else{const it=items.find(i=>i.sid===o.payload.itemId);if(it){it.photoUrl=r.marker;persistItems();}}}catch(e){if(e.code)err=e.message;else break;}
    if(err||small){q=q.filter(z=>z!==o);if(err){const bad=ssGet('ss_failed',[]);bad.push({type:'photo',error:err,id:o.payload.itemId});ssSet('ss_failed',bad);}}}
   syQSave(q);
-  if(!q.length)await SY.pull();
+  if(!q.length)await SY.pull();else if(q.length<n0)setTimeout(SY.sync,400);
  }catch(e){if(e.code==='LICENSE_LOCKED')ssLock();else{SY.lastError=e.message+' @ '+String(e.stack||'').split('\n')[1];console.warn('Sync problem:',SY.lastError);}}
  SY.busy=false;SY.chip(SY.lastError&&syQ().length?'Sync problem, will retry':undefined);};
 SY.fixSale=(o,r)=>{const s=sales.find(x=>x.id===o.payload.saleId);if(s&&r&&+s.total!==+r.total){SY.merging=true;s.subtotal=r.subtotal-r.discount;s.vatAmount=r.vat;s.total=r.total;persistSales();ssSet('ss_snap',SY.shape());SY.merging=false;}};
