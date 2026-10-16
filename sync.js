@@ -70,7 +70,7 @@ SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.l
  }catch(e){if(e.code==='LICENSE_LOCKED')ssLock();else{SY.lastError=e.message+' @ '+String(e.stack||'').split('\n')[1];console.warn('Sync problem:',SY.lastError);}}
  SY.busy=false;SY.chip(SY.lastError&&syQ().length?'Sync problem, will retry':undefined);};
 SY.fixSale=(o,r)=>{const s=sales.find(x=>x.id===o.payload.saleId);if(s&&r&&+s.total!==+r.total){SY.merging=true;s.subtotal=r.subtotal-r.discount;s.vatAmount=r.vat;s.total=r.total;persistSales();ssSet('ss_snap',SY.shape());SY.merging=false;}};
-SY.pull=async()=>{const p=await SS.api('pull',{token:currentUser.token,since:ssGet('ss_since',null)});
+SY.pull=async()=>{const p=await SS.api('pull',{token:currentUser.token,since:ssGet('ss_since',null)});if(p.me&&p.me.perms){currentUser.perms=p.me.perms;const cu=users.find(x=>x.id===currentUser.id);if(cu)cu.perms=p.me.perms;persistUsers();applyRoleLocks();}
  const ep=String((p.settings&&p.settings.DataEpoch)||'0'),mine=ssGet('ss_epoch',null);if(mine===null)ssSet('ss_epoch',ep);else if(mine!==ep){SY.wipeLocal(ep);return SY.pull();}   // the admin reset the data: start clean too
 clearTimeout(SY.dt);SY.diff();if(syQ().length)return;
  const before=JSON.stringify([items,debtors,sales.length,expenses,activityLog.length]);SY.merging=true;
