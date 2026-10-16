@@ -384,8 +384,8 @@ function applyRoleLocks(){
 function renderDashboard(){
   const today = sales.filter(s=>s.isoDate===todayIso() && !s.refunded);
   const todaysTotal = today.reduce((s,x)=>s+x.total,0);
-  const lowStock = items.filter(i=>i.stock<=i.reorder);
-  const stockValue = items.reduce((s,i)=>s+(i.cost||0)*i.stock,0);
+  const lowStock = items.filter(i=>!i.service&&i.stock<=i.reorder);
+  const stockValue = items.reduce((s,i)=>s+(i.service?0:(i.cost||0)*i.stock),0);
   const qtyByItem = {};
   today.forEach(s=>s.lines.forEach(l=>{ qtyByItem[l.name]=(qtyByItem[l.name]||0)+l.qty; }));
   const topSeller = Object.entries(qtyByItem).sort((a,b)=>b[1]-a[1])[0];
@@ -471,21 +471,21 @@ function renderInventory(){
     ? `<tr><th></th><th>${t('colItem')}</th><th>${t('colCategory')}</th><th>${t('colStock')}</th><th>${t('colCost')}</th><th>${t('colSellPrice')}</th><th>${t('colMargin')}</th><th>${t('colStatus')}</th><th></th></tr>`
     : `<tr><th></th><th>${t('colItem')}</th><th>${t('colCategory')}</th><th>${t('colStock')}</th><th>${t('colSellPrice')}</th><th>${t('colStatus')}</th><th></th></tr>`;
   document.getElementById('invBody').innerHTML = rows.map(i=>{
-    const low = (i.bundle ? bundleAvailableStock(i) : i.stock) <= i.reorder;
+    const low = !i.service && (i.bundle ? bundleAvailableStock(i) : i.stock) <= i.reorder;
     const expiryInfo = expiryStatus(i.expiry);
-    const status = `<span class="pill ${low?'low':'ok'}">${low?t('lowStockPill'):t('inStockPill')}</span>${expiryInfo ? ` <span class="pill ${expiryInfo.pillClass}">${expiryInfo.label}</span>` : ''}`;
+    const status = i.service ? `<span class="pill ok">Service</span>` :`<span class="pill ${low?'low':'ok'}">${low?t('lowStockPill'):t('inStockPill')}</span>${expiryInfo ? ` <span class="pill ${expiryInfo.pillClass}">${expiryInfo.label}</span>` : ''}`;
     if(editingItemId===i.id) return renderEditRow(i, isAdmin);
     if(restockingItemId===i.id) return renderRestockRow(i);
     const nameCell = `${esc(i.name)}${i.bundle?` <span class="pill ok">${t('bundlePill')}</span>`:''}${i.trackBatches?` <a onclick="viewBatches(${i.id})" style="cursor:pointer; font-size:10.5px; color:var(--muted);">🏷 ${t('batchesLink')}</a>`:''}${i.supplier ? `<br><span class="stock" style="color:var(--muted);">${t('supplierLabel')}: ${esc(i.supplier)}</span>` : ''}${i.branch ? `<br><span class="stock" style="color:var(--muted);">📍 ${esc(i.branch)}</span>` : ''}`;
     const costCell = i.cost==null ? `<span class="pill pending">${t('pendingCost')}</span>` : `<span class="mono">${naira(i.cost)}</span>`;
     const margin = i.cost==null ? '—' : (((i.price-i.cost)/i.price)*100).toFixed(0)+'%';
-    const displayStock = i.bundle ? bundleAvailableStock(i) : i.stock;
+    const displayStock = i.service ? '—' : (i.bundle ? bundleAvailableStock(i) : i.stock);
     // Editing price/cost is Admin-only, by design — staff get a Restock action
     // (adds stock, optional supplier/expiry) instead of the ability to overwrite
     // price, which is one of the fraud-prevention rules this app is built around.
     const actionBtns = isAdmin
-      ? `<button class="btn sm ghost" onclick="startEditItem(${i.id})" title="${t('editTitle')}">✎ ${t('editBtn')}</button> ${i.bundle?'':`<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`}`
-      : (i.bundle ? '' : `<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`);
+      ? `<button class="btn sm ghost" onclick="startEditItem(${i.id})" title="${t('editTitle')}">✎ ${t('editBtn')}</button> ${(i.bundle||i.service)?'':`<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`}`
+      : ((i.bundle||i.service) ? '' : `<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`);
     return isAdmin
       ? `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${displayStock} ${esc(i.unit)}</td><td>${costCell}</td><td class="mono">${naira(i.price)}</td><td class="mono">${margin}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`
       : `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${displayStock} ${esc(i.unit)}</td><td class="mono">${naira(i.price)}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`;
@@ -569,7 +569,7 @@ function renderEditRow(i, isAdmin){
     <td>${photoCell(i)}</td>
     <td><b>${esc(i.name)}</b></td>
     <td>${esc(i.category)}</td>
-    <td><input type="number" class="mono editcell editcell-sm" id="editStock" value="${i.stock}"> ${esc(i.unit)}</td>
+<td>${i.service ? '<span class="mono">—</span><input type="hidden" id="editStock" value="0">' : `<input type="number" class="mono editcell editcell-sm" id="editStock" value="${i.stock}"> ${esc(i.unit)}`}</td>
     ${costInput}
     <td><input type="number" class="mono editcell" id="editPrice" value="${i.price}"></td>
     ${marginTd}
@@ -772,7 +772,7 @@ function toggleBundleBuilder(){
 }
 function populateBundleComponentSelect(){
   const sel = document.getElementById('bundleComponentSelect');
-  sel.innerHTML = items.filter(i=>!i.bundle).map(i=>`<option value="${i.id}">${esc(i.name)} (${i.stock} ${esc(i.unit)})</option>`).join('');
+  sel.innerHTML = items.filter(i=>!i.bundle && !i.service).map(i=>`<option value="${i.id}">${esc(i.name)} (${i.stock} ${esc(i.unit)})</option>`).join('');
 }
 function addBundleComponent(){
   const itemId = Number(document.getElementById('bundleComponentSelect').value);
@@ -803,32 +803,39 @@ function viewBatches(id){
   alert(`Batches for ${item.name}:\n\n${lines.join('\n')}`);
 }
 
+function toggleServiceMode(){
+  const on = document.getElementById('newIsService').checked;
+  ['newStock','newReorder'].forEach(id=>{ const el=document.getElementById(id); el.disabled=on; if(on) el.value=''; el.closest('div').style.opacity = on?.4:1; });
+  if(on){ document.getElementById('newIsBundle').checked=false; document.getElementById('bundleBuilder').style.display='none'; document.getElementById('newTrackBatches').checked=false; }
+  document.getElementById('newIsBundle').disabled=on; document.getElementById('newTrackBatches').disabled=on;
+}
 function submitNewItem(){
   const name = document.getElementById('newName').value.trim();
   const category = document.getElementById('newCategory').value;
   const unit = document.getElementById('newUnit').value.trim() || 'piece';
   const price = Number(document.getElementById('newPrice').value);
-  const isBundle = document.getElementById('newIsBundle').checked;
-  const stock = isBundle ? 0 : (Number(document.getElementById('newStock').value) || 0);
-  const reorder = Number(document.getElementById('newReorder').value) || 5;
+  const isService = document.getElementById('newIsService').checked;
+  const isBundle = !isService && document.getElementById('newIsBundle').checked;
+  const stock = (isBundle||isService) ? 0 : (Number(document.getElementById('newStock').value) || 0);
+  const reorder = isService ? 0 : (Number(document.getElementById('newReorder').value) || 5);
   const cost = role()==='admin' ? Number(document.getElementById('newCost').value) : null;
   const supplier = document.getElementById('newSupplier').value.trim();
   const expiry = document.getElementById('newExpiry').value || null;
   const branch = document.getElementById('newBranch').value || null;
-  const trackBatches = document.getElementById('newTrackBatches').checked;
+  const trackBatches = !isService && document.getElementById('newTrackBatches').checked;
   if(!name || !price){ alert('Please add at least a product name and selling price.'); return; }
   if(isBundle && pendingBundle.length<2){ alert('A bundle needs at least 2 component products.'); return; }
   const id = Math.max(0,...items.map(i=>i.id)) + 1;
   items.push({ id, name, category: category||CATEGORIES[0], unit, cost:(cost||cost===0)?cost:null, price, stock, reorder, photo: pendingPhoto,
     barcode: '600900'+String(1000000+id), supplier: supplier||null, expiry, branch,
-    bundle: isBundle ? pendingBundle.slice() : null,
+    bundle: isBundle ? pendingBundle.slice() : null,service: isService,
     trackBatches, batches: trackBatches ? [] : null });
   persistItems();
   logActivity(`Added new product "${name}"${supplier?` (supplier: ${supplier})`:''}${isBundle?' as a bundle':''}${trackBatches?' (batch-tracked)':''}`);
   pendingPhoto = null; pendingBundle = [];
   ['newName','newUnit','newPrice','newStock','newReorder','newCost','newSupplier','newExpiry'].forEach(id2=>document.getElementById(id2).value='');
   document.getElementById('newPhotoPreview').style.display='none'; document.getElementById('newPhotoPlaceholder').style.display='flex';
-  document.getElementById('newIsBundle').checked=false; document.getElementById('newTrackBatches').checked=false;
+  document.getElementById('newIsBundle').checked=false; document.getElementById('newTrackBatches').checked=false; document.getElementById('newIsService').checked=false; toggleServiceMode();
   document.getElementById('bundleBuilder').style.display='none'; document.getElementById('bundleComponentList').innerHTML='';
   toggleAddBox(); renderAll();
 }
@@ -842,13 +849,14 @@ function renderSaleSearch(){
     <button class="btn sm gold" onclick="addToCart(${i.id})" ${itemAvailable(i)<1?'disabled':''}>Add</button></div>`).join('')
     || (q ? `<p class="helptext">No matches.</p>` : `<p class="helptext">Start typing to find an item…</p>`);
 }
-function itemAvailable(item){ return item.bundle ? bundleAvailableStock(item) : item.stock; }
+function itemAvailable(item){ if(item.service) return Infinity; return item.bundle ? bundleAvailableStock(item) : item.stock; }
 /* Consumes stock FIFO from a batch-tracked item's batch list (oldest batch
    first — the standard approach for anything with expiry or warranty
    implications), and always keeps item.stock as the simple source of truth
    for everything else in the app that just reads a plain number. */
 function consumeStock(item, qty){
-  item.stock -= qty;
+  if(item.service) return;
+   item.stock -= qty;
   if(item.trackBatches && item.batches && item.batches.length){
     let remaining = qty;
     for(const b of item.batches){
@@ -1066,7 +1074,7 @@ function shareReceiptWa(){
   window.open(`https://wa.me/?text=${text}`,'_blank');
 }
 function shareLowStockWa(){
-  const lowStock = items.filter(i=>i.stock<=i.reorder);
+  const lowStock = items.filter(i=>!i.service&&i.stock<=i.reorder);
   let text = `Low stock alert — ${settings.name}%0A`;
   lowStock.forEach(i=>{ text += `${i.name}: ${i.stock} ${i.unit} left (reorder at ${i.reorder})%0A`; });
   window.open(`https://wa.me/${settings.wa||''}?text=${text}`,'_blank');
@@ -1211,7 +1219,7 @@ function renderReports(){
   const qtyAllTime = {};
   nonRefunded.forEach(s=>s.lines.forEach(l=>{ qtyAllTime[l.name] = (qtyAllTime[l.name]||0) + l.qty; }));
   const suggestions = Object.entries(qtyAllTime).map(([name,totalQty])=>{
-    const item = items.find(i=>i.name===name); if(!item) return null;
+    const item = items.find(i=>i.name===name); if(!item||item.service) return null;
     const avgDaily = totalQty/numDays;
     const daysLeft = avgDaily>0 ? Math.floor(item.stock/avgDaily) : null;
     return { name, avgDaily, daysLeft, item };
@@ -1228,7 +1236,7 @@ function refundSale(id){
   const sale = sales.find(s=>s.id===id);
   if(!sale || sale.refunded) return;
   if(!confirm(`Refund ${sale.id} (${naira(sale.total)}) and return these items to stock?`)) return;
-  sale.lines.forEach(l=>{ const item = items.find(i=>i.name===l.name); if(item) item.stock += l.qty; });
+  sale.lines.forEach(l=>{ const item = items.find(i=>i.name===l.name); if(item && !item.service) item.stock += l.qty; });
   sale.refunded = true;
   persistItems(); persistSales();
   logActivity(`Refunded sale ${sale.id} (${naira(sale.total)}) — items returned to stock`);
@@ -1314,7 +1322,7 @@ function renderCloseDay(){
   const today = sales.filter(s=>s.isoDate===todayIso() && !s.refunded);
   const total = today.reduce((s,x)=>s+x.total,0);
   const cashTotal = today.filter(s=>s.payment==='Cash').reduce((s,x)=>s+x.total,0);
-  const lowStock = items.filter(i=>i.stock<=i.reorder).length;
+  const lowStock = items.filter(i=>!i.service&&i.stock<=i.reorder).length;
   document.getElementById('closeCards').innerHTML = `
     <div class="card"><div class="k">${t('cardTotalSalesToday')}</div><div class="v">${naira(total)}</div></div>
     <div class="card"><div class="k">${t('cardCashSalesToday')}</div><div class="v good">${naira(cashTotal)}</div></div>
@@ -1367,7 +1375,7 @@ function printCloseDay(){
   const total = today.reduce((s,x)=>s+x.total,0);
   const cashTotal = today.filter(s=>s.payment==='Cash').reduce((s,x)=>s+x.total,0);
   const counted = Number(document.getElementById('countedCash').value)||0;
-  const lowStockCount = items.filter(i=>i.stock<=i.reorder).length;
+  const lowStockCount = items.filter(i=>!i.service&&i.stock<=i.reorder).length;
   showPrintableReport('Close-Day Report', `${todayIso()} · ${today.length} transactions`,
     ['Figure','Amount'],
     [
@@ -1399,7 +1407,7 @@ function printSalesLog(){
   showPrintableReport('Sales Log', `${range.from} → ${range.to}`, ['Receipt #','Time','Staff','Payment','Total'], rows);
 }
 function printLowStock(){
-  const low = items.filter(i=>i.stock<=i.reorder);
+  const low = items.filter(i=>!i.service&&i.stock<=i.reorder);
   showPrintableReport('Low Stock List', `${low.length} items at or below reorder point`,
     ['Item','Category','In stock','Reorder at'],
     low.map(i=>[esc(i.name), esc(i.category), `${i.stock} ${esc(i.unit)}`, i.reorder]),
