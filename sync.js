@@ -24,16 +24,16 @@ SY.sched=()=>{clearTimeout(SY.dt);SY.dt=setTimeout(SY.diff,0);};
 const newBatch=(i,o)=>{const b=(i.batches||[]).filter(x=>!(o.bc||[]).includes(x.code)).pop();return b?{code:b.code,expiry:b.expiry||'',dateAdded:b.dateAdded}:{code:'RESTOCK',expiry:'',dateAdded:todayIso()};};
 SY.diff=()=>{if(SY.merging||!currentUser||!syDev())return;SY.sids();const old=ssGet('ss_snap',null),now=SY.shape();if(!old){ssSet('ss_snap',now);return;}
  const ops=[],photos=[],byId=id=>items.find(i=>i.id===id),lineItem=l=>byId(l.itemId)||items.find(i=>i.name===l.name),delta={};
- const draw=(l,sign)=>{const x=lineItem(l);if(!x)return;(x.bundle?x.bundle.map(c=>[c.itemId,c.qty*l.qty]):[[x.id,l.qty]]).forEach(([id,n])=>{delta[id]=(delta[id]||0)+sign*n;});};
+ const draw=(l,sign)=>{const x=lineItem(l);if(!x||x.service)return;(x.bundle?x.bundle.map(c=>[c.itemId,c.qty*l.qty]):[[x.id,l.qty]]).forEach(([id,n])=>{delta[id]=(delta[id]||0)+sign*n;});};
  const newSales=sales.filter(s=>old.sales[s.id]===undefined),refunded=sales.filter(s=>old.sales[s.id]===false&&s.refunded);
  newSales.forEach(s=>s.lines.forEach(l=>draw(l,-1)));refunded.forEach(s=>s.lines.forEach(l=>draw(l,1)));
  debtors.forEach(d=>{const n=old.debtors[d.id];if(n===undefined)ops.push(['debtor.add',{customerId:d.sid,name:d.name,phone:d.phone||''}]);else d.history.slice(n).forEach(h=>{if(h.type==='payment')ops.push(['debtor.payment',{customerId:d.sid,amount:h.amount}]);});});
  items.forEach(i=>{const o=old.items[i.id];
   if(currentUser.role==='admin'&&i.photo&&String(i.photo).startsWith('data:')&&(!o||o.ph!==syPh(i)))photos.push({itemId:i.sid,dataUrl:i.photo});
-  if(!o){ops.push(['item.create',{itemId:i.sid,name:i.name,barcode:i.barcode||'',category:i.category||'General',unit:i.unit||'piece',cost:+i.cost||0,price:i.price,openingStock:i.bundle?0:(+i.stock||0),reorder:+i.reorder||0,expiry:i.expiry||'',branch:i.branch||'',trackBatches:!!i.trackBatches,batch:i.trackBatches&&!i.bundle&&+i.stock>0?{code:'OPENING',expiry:i.expiry||'',dateAdded:todayIso()}:undefined,bundle:i.bundle?i.bundle.map(c=>({itemId:(byId(c.itemId)||{}).sid,qty:c.qty})):undefined}]);return;}
+  if(!o){ops.push(['item.create',{itemId:i.sid,name:i.name,barcode:i.barcode||'',category:i.category||'General',unit:i.unit||'piece',cost:+i.cost||0,price:i.price,kind:i.service?'service':undefined,openingStock:(i.bundle||i.service)?0:(+i.stock||0),reorder:+i.reorder||0,expiry:i.expiry||'',branch:i.branch||'',trackBatches:!!i.trackBatches,batch:i.trackBatches&&!i.bundle&&+i.stock>0?{code:'OPENING',expiry:i.expiry||'',dateAdded:todayIso()}:undefined,bundle:i.bundle?i.bundle.map(c=>({itemId:(byId(c.itemId)||{}).sid,qty:c.qty})):undefined}]);return;}
   const ch={};['name','barcode','category','unit','cost','price','reorder','expiry','branch','trackBatches'].forEach(f=>{const a=f==='trackBatches'?!!i[f]:i[f]??'',b=f==='trackBatches'?!!o[f]:o[f]??'';if(String(a)!==String(b))ch[f]=a;});
   if(Object.keys(ch).length)ops.push(['item.update',{itemId:i.sid,changes:ch}]);
-  if(!i.bundle){const un=(+i.stock||0)-(+o.stock||0)-(delta[i.id]||0);   // whatever the sales and refunds do not explain was a restock or correction
+  if(!i.bundle&&!i.service){const un=(+i.stock||0)-(+o.stock||0)-(delta[i.id]||0);   // whatever the sales and refunds do not explain was a restock or correction
    if(un<0)SY.adjBatch=SY.adj[i.id];
    if(un>0)ops.push(['stock.in',{itemId:i.sid,qty:un,supplier:i.supplier||'',batch:i.trackBatches?newBatch(i,o):undefined}]);else if(un<0){ops.push(['stock.out',{itemId:i.sid,qty:-un,reason:'Adjustment',direction:'OUT',note:'Changed in the app',batch:i.trackBatches&&SY.adj[i.id]?{code:SY.adj[i.id]}:undefined}]);delete SY.adj[i.id];}}});
  newSales.forEach(s=>{const c=s.payment==='Credit'?debtors.find(d=>d.name.toLowerCase()===String(s.customer||'').toLowerCase().trim()):null,dc=s.discount;
@@ -48,7 +48,7 @@ if(currentUser.role==='admin'){const lm=now.logoMark;if(lm&&lm!==(old.logoMark||
  ssSet('ss_snap',now);ops.forEach(([t,p])=>SY.q(t,p));photos.forEach(p=>SY.q('__photo',p));};
 ['persistItems','persistSales','persistDebtors','persistExpenses','persistSettings','persistBranches'].forEach(n=>{const o=window[n];window[n]=function(){o();SY.sched();};});
 const syClose=confirmCloseDay;confirmCloseDay=function(){const c=Number(document.getElementById('countedCash').value)||0;syClose();SY.q('cash.close',{date:todayIso(),counted:c});};
-const syLog=logActivity,COVERED=/^(Registered sale|Added new product|Edited |Restocked|Refunded sale|Logged expense|Deleted expense|Recorded payment|Added customer|Closed the day|Discount requested|Imported products|Logged in|Registered a new|Reset password|Added staff|Deactivated|Reactivated|Changed password|Created the owner)/;
+const syLog=logActivity,COVERED=/^(Registered sale|Added new product|Edited |Restocked|Refunded sale|Logged expense|Deleted expense|Recorded payment|Added customer|Closed the day|Discount requested|Imported products|Logged in|Registered a new|Reset password|Removed account|Added staff|Deactivated|Reactivated|Changed password|Created the owner)/;
 logActivity=function(a){syLog(a);if(!SY.merging&&currentUser&&!COVERED.test(a))SY.q('audit.log',{action:String(a).slice(0,150)});};
 
 /* ---- 2. Send, then bring the server's version back ---- */
@@ -86,7 +86,7 @@ SY.fetchPhotos=async()=>{if(settings.logoWant){const w=settings.logoWant;if(w===
  SY.merging=true;try{need.forEach(i=>{const p=d.photos[i.sid];if(p){i.photo=p.dataUrl;i.photoUrl=p.version;}i.photoWant=null;});persistItems();ssSet('ss_snap',SY.shape());}finally{SY.merging=false;}}};
 SY.mItems=(list,batches)=>{const by={};items.forEach(i=>{if(i.sid)by[i.sid]=i;});let nid=Math.max(0,...items.map(i=>+i.id||0))+1;const seen=new Set(),live=list.filter(x=>String(x.Active).toUpperCase()==='TRUE');
  live.forEach(x=>{seen.add(x.ItemID);let i=by[x.ItemID];if(!i){i={id:nid++,sid:x.ItemID,photo:null,supplier:null};items.push(i);by[x.ItemID]=i;}
-  Object.assign(i,{name:x.Name,category:x.Category||'General',unit:x.Unit||'piece',price:+x.SellingPrice,stock:x.BundleJSON?0:+x.CurrentStock,reorder:+x.ReorderThreshold||0,expiry:x.ExpiryDate||null,branch:x.Branch||null,trackBatches:String(x.TrackBatches).toUpperCase()==='TRUE'});
+  Object.assign(i,{name:x.Name,category:x.Category||'General',unit:x.Unit||'piece',price:+x.SellingPrice,service:String(x.Kind).toLowerCase()==='service',stock:(x.BundleJSON||String(x.Kind).toLowerCase()==='service')?0:+x.CurrentStock,reorder:+x.ReorderThreshold||0,expiry:x.ExpiryDate||null,branch:x.Branch||null,trackBatches:String(x.TrackBatches).toUpperCase()==='TRUE'});
   if(/^ph:/.test(x.PhotoURL||'')&&x.PhotoURL!==i.photoUrl)i.photoWant=x.PhotoURL;
   i.barcode=x.Barcode||i.barcode||'600900'+String(1000000+i.id);if(x.CostPrice!==undefined)i.cost=+x.CostPrice;else if(i.cost===undefined)i.cost=null;});
  live.forEach(x=>{const i=by[x.ItemID];if(x.BundleJSON)i.bundle=JSON.parse(x.BundleJSON).map(c=>({itemId:by[c.itemId]?by[c.itemId].id:0,qty:c.qty}));else delete i.bundle;});
