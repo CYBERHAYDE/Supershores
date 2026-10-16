@@ -105,20 +105,22 @@ function ssFindDate(t){const r=[];let m,x;x=/(\d{4})-(\d{2})-(\d{2})/g;while(m=x
 function ssFindAmount(t){const c=[];let m,x=/(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d{3,7}\.\d{2})/g;while(m=x.exec(t)){const v=parseFloat(m[1].replace(/,/g,''));if(v>=100&&v<1e8)c.push(v);}
  x=/(?:₦|NGN|#)\s?(\d{4,8})(?!\d)/g;while(m=x.exec(t))c.push(+m[1]);return c.length?Math.max(...c):0;}
 const ssFindRef=t=>{const m=/(?:ref(?:erence)?|session\s*id|transaction\s*(?:no|id|ref)\w*)[^A-Za-z0-9]{0,6}([A-Za-z0-9\-]{8,40})/i.exec(t);return m?m[1]:'';};
+const ssAcctMatch=(t,L)=>{const d=String(t).replace(/\D/g,''),num=String(L.accountNumber||'').replace(/\D/g,''),name=String(L.accountName||'').toLowerCase().split(/\s+/).filter(w=>w.length>2);
+ return !!num&&(d.includes(num)||(d.includes(num.slice(-4))&&name.some(w=>String(t).toLowerCase().includes(w))));};
 const ssLoadOcr=()=>window.Tesseract?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>no(new Error('reader'));document.head.append(s);});
 async function ssPrep(file){const b=await createImageBitmap(file),sc=Math.min(1,1400/Math.max(b.width,b.height)),c=document.createElement('canvas');c.width=Math.round(b.width*sc);c.height=Math.round(b.height*sc);
  c.getContext('2d').drawImage(b,0,0,c.width,c.height);let q=.75,u=c.toDataURL('image/jpeg',q);while(u.length>590000&&q>.3){q-=.1;u=c.toDataURL('image/jpeg',q);}return{c,u};}
 window.ssPay=function(){const L=SS.lic||ssGet('ss_lic',{});
  ssOverlay(`<h2>Upload payment receipt</h2><p class="helptext">Pay ${ssMoney(L.price)} to ${esc(L.bank||'')}, ${esc(L.accountName||'')}, ${esc(L.accountNumber||'')}. Then add a clear screenshot or photo of the receipt.</p>
   <input type="file" id="ssFile" accept="image/*"><p class="helptext" id="ssMsg" role="status"></p><div id="ssBody"></div><button class="btn ghost" onclick="ssClose()">Close</button>`);
- document.getElementById('ssFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;let img,hash,A=0,D='',R='',note='';
+ document.getElementById('ssFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;let img,hash,A=0,D='',R='',note='',T='',acct=false;
   try{ssSay('Preparing the image...');img=await ssPrep(f);hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await f.arrayBuffer()))].map(x=>x.toString(16).padStart(2,'0')).join('');
-   try{ssSay('Reading the receipt. This can take up to a minute the first time.');await ssLoadOcr();const r=await Tesseract.recognize(img.c,'eng');A=ssFindAmount(r.data.text);D=ssFindDate(r.data.text);R=ssFindRef(r.data.text);}
+   try{ssSay('Reading the receipt. This can take up to a minute the first time.');await ssLoadOcr();const r=await Tesseract.recognize(img.c,'eng');T=r.data.text;A=ssFindAmount(T);D=ssFindDate(T);R=ssFindRef(T);acct=ssAcctMatch(T,L);}
    catch(x){note='We could not read the receipt automatically. Please type the details from it.';}}catch(x){return ssSay('That image could not be opened. Try another one.');}
   if(!note&&(!A||!D))note='Please check the details below and fill in what we could not read.';ssSay(note||'Check these details, then submit.');
   document.getElementById('ssBody').innerHTML=`<label>Amount paid</label><input id="ssA" inputmode="decimal" value="${A||''}"><label>Date of payment (YYYY-MM-DD)</label><input id="ssD" value="${esc(D)}"><label>Reference (optional)</label><input id="ssR" value="${esc(R)}"><button class="btn gold" id="ssGo" style="width:100%;margin:6px 0 10px;">Submit receipt</button>`;
   document.getElementById('ssGo').onclick=async()=>{const b=document.getElementById('ssGo');b.disabled=true;ssSay('Sending...');
-   try{const r=await SS.api('payment.submit',{token:currentUser.token,dataUrl:img.u,amount:+document.getElementById('ssA').value||0,payDate:document.getElementById('ssD').value.trim(),reference:document.getElementById('ssR').value.trim(),imageHash:hash});
+   try{const r=await SS.api('payment.submit',{token:currentUser.token,dataUrl:img.u,amount:+document.getElementById('ssA').value||0,payDate:document.getElementById('ssD').value.trim(),reference:document.getElementById('ssR').value.trim(),imageHash:hash,ocr:{read:{amount:!!A,date:!!D,ref:!!R,account:acct},edited:(+document.getElementById('ssA').value||0)!==A||document.getElementById('ssD').value.trim()!==D||document.getElementById('ssR').value.trim()!==R}});
     ssSay(r.message);if(r.license&&!r.license.locked){ssSet('ss_lic',r.license);setTimeout(()=>location.reload(),1800);}else b.hidden=true;}catch(x){ssSay(x.message);b.disabled=false;}};};};
 
 /* ---------- Automatic updates ---------- */
