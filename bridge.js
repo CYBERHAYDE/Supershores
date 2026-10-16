@@ -90,7 +90,7 @@ SS.afterEnter=async function(){SS.token=currentUser.token;ssInjectPanels();
  if(!SS.dev_)SS.dev_=SS.dev();
  if(!(await SS.gate()))return;const L=SS.lic;
  if(L&&L.showReminder){const own=currentUser.role==='admin',head=L.state==='grace'?`Your subscription has ended. ${L.graceLeft} grace day${L.graceLeft===1?'':'s'} left`:`Subscription ends in ${L.daysLeft} day${L.daysLeft===1?'':'s'}`;
-  ssOverlay(`<h2>${head}</h2><p>To renew, pay ${ssMoney(L.price)} to:<br><b>${esc(L.bank)}<br>${esc(L.accountName)}<br>${esc(L.accountNumber)}</b></p>${own?'':'<p class="helptext">Please tell the owner.</p>'}<div class="row">${own?'<button class="btn gold" onclick="ssPay()">Upload receipt</button>':''}<button class="btn ghost" onclick="ssClose()">Later</button></div>`);}};
+  ssOverlay(`<img class="lg" src="${settings.logo||SS_LOGO}" alt="Supershores"><h2>${head}</h2><p>To renew, pay ${ssMoney(L.price)} to:<br><b>${esc(L.bank)}<br>${esc(L.accountName)}<br>${esc(L.accountNumber)}</b></p>${own?'':'<p class="helptext">Please tell the owner.</p>'}<div class="row">${own?'<button class="btn gold" onclick="ssPay()">Upload receipt</button>':''}<button class="btn ghost" onclick="ssClose()">Later</button></div>`);}};
 SS.dev=async function(){if(ssGet('ss_dev',null)){window.SALE_PREFIX=ssGet('ss_dev');return;}if(!navigator.onLine||!SS.token)return;
  try{const d=await SS.api('registerDevice',{token:SS.token,label:navigator.userAgent.slice(0,40)});ssSet('ss_dev',d.deviceCode);window.SALE_PREFIX=d.deviceCode;}catch(e){}};
 const ssEnter=enterApp;enterApp=function(){ssEnter();SS.afterEnter();};
@@ -239,7 +239,7 @@ SS.calc=function(L){if(!L||!L.expiry)return L;const a=ssToday().split('-').map(N
  return Object.assign({},L,{daysLeft,state,showReminder:state!=='active',locked:state==='suspended'||state==='expired',graceLeft:daysLeft<=0?Math.max(0,g+daysLeft):g});};
 SS.remind=function(){const L=SS.lic;if(!L||!L.showReminder||L.locked||!currentUser)return;const own=currentUser.role==='admin',
  head=L.state==='grace'?`Your subscription has ended. ${L.graceLeft} grace day${L.graceLeft===1?'':'s'} left`:`Subscription ends in ${L.daysLeft} day${L.daysLeft===1?'':'s'}`;
- ssOverlay(`<h2>${head}</h2><p>To renew, pay ${ssMoney(L.price)} to:<br><b>${esc(L.bank)}<br>${esc(L.accountName)}<br>${esc(L.accountNumber)}</b></p>${own?'':'<p class="helptext">Please tell the owner.</p>'}<div class="row">${own?'<button class="btn gold" onclick="ssPay()">Upload receipt</button>':''}<button class="btn ghost" onclick="ssClose()">Close</button></div>`,true);};
+ ssOverlay(`<img class="lg" src="${settings.logo||SS_LOGO}" alt="Supershores"><h2>${head}</h2><p>To renew, pay ${ssMoney(L.price)} to:<br><b>${esc(L.bank)}<br>${esc(L.accountName)}<br>${esc(L.accountNumber)}</b></p>${own?'':'<p class="helptext">Please tell the owner.</p>'}<div class="row">${own?'<button class="btn gold" onclick="ssPay()">Upload receipt</button>':''}<button class="btn ghost" onclick="ssClose()">Close</button></div>`,true);};
 SS.banner=function(){const L=SS.lic;let b=document.getElementById('ssExp');
  if(!currentUser||!L||!L.showReminder||L.locked){if(b)b.remove();return;}
  if(!b){b=document.createElement('button');b.id='ssExp';b.style.cssText='position:fixed;top:6px;left:50%;transform:translateX(-50%);z-index:9000;border:0;border-radius:99px;padding:7px 16px;font:700 13px/1.2 var(--font-sans,sans-serif);background:#F0A63D;color:#1b1b1b;box-shadow:0 2px 10px #0004;cursor:pointer;max-width:92vw';b.onclick=()=>SS.remind();document.body.append(b);}
