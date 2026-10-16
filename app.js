@@ -1459,8 +1459,7 @@ function removeLogo(){
 function updateBrandMark(){
   const mark = document.getElementById('brandMark');
   if(!mark) return;
-  if(settings.logo) mark.innerHTML = `<img src="${settings.logo}" style="width:100%; height:100%; object-fit:cover; border-radius:9px;">`;
-  else mark.textContent = 'A';
+  mark.innerHTML = `<img src="assets/icon-192.png" alt="Supershores" style="width:100%; height:100%; object-fit:contain; border-radius:9px; background:#fff;">`;
 }
 /* ================= Brand colors ================= */
 /* Only two colors are picked (primary + accent) — everything else (hover
