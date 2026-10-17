@@ -375,7 +375,7 @@ function applyRoleLocks(){
   document.getElementById('settingsLocked').style.display = isStaff?'block':'none';
   document.getElementById('settingsContent').style.display = isStaff?'none':'block';
     document.getElementById('costFieldWrap').style.display = (isStaff && !can('items'))?'none':'block';
-  document.getElementById('staffCostNote').style.display = (isStaff && !can('items'))'block':'none';
+  document.getElementById('staffCostNote').style.display = (isStaff && !can('items'))?'block':'none';
   document.getElementById('importBtn').style.display = isStaff?'none':'inline-flex';
   const activeTab = document.querySelector('nav.tabs button.active').dataset.view;
     if(isStaff && (['reports','activity','closeday','settings'].includes(activeTab) || (activeTab==='expenses'&&!can('expenses')) || (activeTab==='sale'&&!can('sell')) || (activeTab==='debtors'&&!can('debtors')))) switchView('dashboard');
