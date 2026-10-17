@@ -28,7 +28,8 @@ SY.diff=()=>{if(SY.merging||!currentUser||!syDev())return;SY.sids();const old=ss
  const newSales=sales.filter(s=>old.sales[s.id]===undefined),refunded=sales.filter(s=>old.sales[s.id]===false&&s.refunded);
  newSales.forEach(s=>s.lines.forEach(l=>draw(l,-1)));refunded.forEach(s=>s.lines.forEach(l=>draw(l,1)));
  debtors.forEach(d=>{const n=old.debtors[d.id];if(n===undefined)ops.push(['debtor.add',{customerId:d.sid,name:d.name,phone:d.phone||''}]);else d.history.slice(n).forEach(h=>{if(h.type==='payment')ops.push(['debtor.payment',{customerId:d.sid,amount:h.amount}]);});});
- items.forEach(i=>{const o=old.items[i.id];
+ {const del=ssGet('ss_del',[]);if(del.length){del.forEach(sid=>ops.push(['item.setActive',{itemId:sid,active:false}]));ssSet('ss_del',[]);}}
+             items.forEach(i=>{const o=old.items[i.id];
   if(currentUser.role==='admin'&&i.photo&&String(i.photo).startsWith('data:')&&(!o||o.ph!==syPh(i)))photos.push({itemId:i.sid,dataUrl:i.photo});
   if(!o){ops.push(['item.create',{itemId:i.sid,name:i.name,barcode:i.barcode||'',category:i.category||'General',unit:i.unit||'piece',cost:+i.cost||0,price:i.price,kind:i.service?'service':undefined,openingStock:(i.bundle||i.service)?0:(+i.stock||0),reorder:+i.reorder||0,expiry:i.expiry||'',branch:i.branch||'',trackBatches:!!i.trackBatches,batch:i.trackBatches&&!i.bundle&&+i.stock>0?{code:'OPENING',expiry:i.expiry||'',dateAdded:todayIso()}:undefined,bundle:i.bundle?i.bundle.map(c=>({itemId:(byId(c.itemId)||{}).sid,qty:c.qty})):undefined}]);return;}
   const ch={};['name','barcode','category','unit','cost','price','reorder','expiry','branch','trackBatches'].forEach(f=>{const a=f==='trackBatches'?!!i[f]:i[f]??'',b=f==='trackBatches'?!!o[f]:o[f]??'';if(String(a)!==String(b))ch[f]=a;});
