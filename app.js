@@ -753,7 +753,7 @@ function confirmImport(){
       updated++;
     } else {
       const id = Math.max(0,...items.map(i=>i.id), 0) + 1 + added;
-      items.push({ id, name:r.name, category:r.category, unit:r.unit, cost:r.cost, price:r.price, stock:r.stock, reorder:r.reorder, photo:null, barcode: r.barcode || ('600900'+String(1000000+id)), supplier:r.supplier, expiry:r.expiry });
+      items.push({ id, name:r.name, category:r.category, unit:r.unit, cost:r.cost, price:r.price, stock:r.stock, reorder:r.reorder, photo:null, barcode: r.barcode || newBarcode(), supplier:r.supplier, expiry:r.expiry });
       added++;
     }
   });
@@ -828,7 +828,7 @@ function submitNewItem(){
   if(isBundle && pendingBundle.length<2){ alert('A bundle needs at least 2 component products.'); return; }
   const id = Math.max(0,...items.map(i=>i.id)) + 1;
   items.push({ id, name, category: category||CATEGORIES[0], unit, cost:(cost||cost===0)?cost:null, price, stock, reorder, photo: pendingPhoto,
-    barcode: '600900'+String(1000000+id), supplier: supplier||null, expiry, branch,
+    barcode: newBarcode(), supplier: supplier||null, expiry, branch,
     bundle: isBundle ? pendingBundle.slice() : null,service: isService,
     trackBatches, batches: trackBatches ? [] : null });
   persistItems();
@@ -1595,4 +1595,102 @@ if(currentUser){
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ 0; });
+}
+/* ---- Branch dropdowns: keep the branch you picked ---- */
+function populateBranchSelects(){
+  const filterSel = document.getElementById('invBranch');
+  const formSel = document.getElementById('newBranch');
+  [filterSel, formSel].forEach(sel=>{
+    if(!sel) return;
+    const keep = sel.value;
+    const startAt = sel===filterSel ? 1 : 0;
+    while(sel.options.length>startAt) sel.remove(startAt);
+    branches.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; sel.appendChild(o); });
+    if(keep && Array.from(sel.options).some(o=>o.value===keep)) sel.value = keep;
+  });
+}
+
+/* ---- A barcode no other product has ---- */
+function newBarcode(){
+  let b;
+  do{ b = '600900' + String(Math.floor(Math.random()*1e7)).padStart(7,'0'); }
+  while(items.some(i=>i.barcode===b));
+  return b;
+}
+
+/* ---- Edit a product: every field, plus Delete ---- */
+function renderEditRow(i, isAdmin){
+  const fld = (label, html)=>`<div class="editfield"><label>${label}</label>${html}</div>`;
+  const cats = Array.from(new Set([...CATEGORIES, i.category].filter(Boolean)));
+  const brs = Array.from(new Set([...branches, i.branch].filter(Boolean)));
+  const plain = !i.service && !i.bundle;
+  return `<tr class="editor-row" style="background:#FBF8ED;"><td colspan="9"><div class="editfield-row">
+    ${fld('Name',`<input type="text" id="editName" value="${esc(i.name)}">`)}
+    ${fld('Category',`<select id="editCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===i.category?'selected':''}>${esc(c)}</option>`).join('')}</select>`)}
+    ${fld('Unit',`<input type="text" id="editUnit" value="${esc(i.unit||'')}">`)}
+    ${fld('Selling price',`<input type="number" id="editPrice" value="${i.price}">`)}
+    ${isAdmin ? fld('Cost price',`<input type="number" id="editCost" value="${i.cost==null?'':i.cost}" placeholder="—">`) : ''}
+    ${plain ? fld('Stock',`<input type="number" id="editStock" value="${i.stock}">`) : `<input type="hidden" id="editStock" value="${i.service?0:i.stock}">`}
+    ${i.service ? '' : fld('Reorder level',`<input type="number" id="editReorder" value="${i.reorder==null?'':i.reorder}">`)}
+    ${fld('Barcode',`<input type="text" id="editBarcode" value="${esc(i.barcode||'')}">`)}
+    ${i.service ? '' : fld('Expiry date',`<input type="date" id="editExpiry" value="${esc(i.expiry||'')}">`)}
+    ${fld('Branch',`<select id="editBranch"><option value="">None</option>${brs.map(b=>`<option value="${esc(b)}" ${b===i.branch?'selected':''}>${esc(b)}</option>`).join('')}</select>`)}
+    ${plain ? fld('Supplier',`<input type="text" id="editSupplier" value="${esc(i.supplier||'')}">`) : ''}
+  </div>
+  <div class="editrow-actions" style="margin-top:12px;">
+    <button class="btn sm gold" onclick="saveEditItem(${i.id})">${t('save')}</button>
+    <button class="btn sm ghost" onclick="cancelEditItem()">${t('cancel')}</button>
+    ${isAdmin ? `<button class="btn sm ghost" style="color:#b3261e;margin-left:auto;" onclick="deleteItem(${i.id})">Delete product</button>` : ''}
+  </div></td></tr>`;
+}
+function saveEditItem(id){
+  const item = items.find(x=>x.id===id); if(!item) return;
+  const val = k => { const el=document.getElementById(k); return el ? el.value : null; };
+  const name = (val('editName')||'').trim();
+  const newPrice = Number(val('editPrice'));
+  const newStock = Number(val('editStock'));
+  const reorderRaw = val('editReorder');
+  const newReorder = reorderRaw===null ? item.reorder : Number(reorderRaw||0);
+  let barcode = (val('editBarcode')||'').trim();
+  if(!name){ alert('The name cannot be empty.'); return; }
+  if(!newPrice || newPrice<=0){ alert('Selling price must be greater than zero.'); return; }
+  if(isNaN(newStock) || newStock<0){ alert('Stock cannot be negative.'); return; }
+  if(isNaN(newReorder) || newReorder<0){ alert('Reorder level cannot be negative.'); return; }
+  if(barcode && items.some(o=>o.id!==id && o.barcode===barcode)){ alert('Another product already uses that barcode.'); return; }
+  if(!barcode) barcode = newBarcode();
+  const changes = [];
+  const show = v => (v==null||v==='') ? '—' : v;
+  const set = (label, key, nv, fmt)=>{ const ov=item[key]; if(String(ov==null?'':ov)!==String(nv==null?'':nv)){ const f=fmt||show; changes.push(`${label} ${f(ov)} → ${f(nv)}`); item[key]=nv; } };
+  const money = v => (v==null||v==='') ? '—' : naira(v);
+  set('name','name',name);
+  set('category','category',val('editCategory')||item.category);
+  set('unit','unit',(val('editUnit')||'').trim()||'piece');
+  set('price','price',newPrice,money);
+  if(!item.bundle && !item.service) set('stock','stock',newStock);
+  if(reorderRaw!==null) set('reorder','reorder',newReorder);
+  set('barcode','barcode',barcode);
+  const expEl = document.getElementById('editExpiry'); if(expEl) set('expiry','expiry',expEl.value||null);
+  set('branch','branch',val('editBranch')||null);
+  const supEl = document.getElementById('editSupplier'); if(supEl) set('supplier','supplier',supEl.value.trim()||null);
+  const costEl = document.getElementById('editCost');
+  if(role()==='admin' && costEl) set('cost','cost',costEl.value==='' ? null : Number(costEl.value),money);
+  persistItems();
+  if(changes.length) logActivity(`Edited "${item.name}" — ${changes.join(', ')}`);
+  editingItemId = null;
+  renderAll();
+}
+
+/* ---- Delete a product (admin only) ---- */
+function deleteItem(id){
+  const it = items.find(x=>x.id===id); if(!it) return;
+  if(role()!=='admin'){ alert('Only an admin can delete products.'); return; }
+  if(items.some(b=>b.bundle && b.bundle.some(c=>c.itemId===id))){ alert(`"${it.name}" is part of a bundle. Remove it from the bundle first.`); return; }
+  if(!confirm(`Delete "${it.name}"?\n\nIt disappears from the stock list and from Register Sale on every phone. Past sales and reports keep its name. This cannot be undone.`)) return;
+  if(it.sid){ const del=JSON.parse(SSLS.getItem('ss_del')||'[]'); del.push(it.sid); SSLS.setItem('ss_del',JSON.stringify(del)); }
+  items = items.filter(x=>x.id!==id);
+  cart = cart.filter(c=>c.id!==id);
+  editingItemId = null; restockingItemId = null;
+  persistItems();
+  logActivity(`Deleted product "${it.name}"`);
+  renderAll();
 }
