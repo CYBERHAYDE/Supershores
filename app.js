@@ -488,8 +488,8 @@ function renderInventory(){
       ? `<button class="btn sm ghost" onclick="startEditItem(${i.id})" title="${t('editTitle')}">✎ ${t('editBtn')}</button> ${(i.bundle||i.service)?'':`<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`}`
       : ((i.bundle||i.service||!can('stock')) ? '' : `<button class="btn sm ghost" onclick="startRestock(${i.id})" title="${t('restockTitle')}">↻ ${t('restockBtn')}</button>`);
     return isAdmin
-      ? `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${displayStock} ${esc(i.unit)}</td><td>${costCell}</td><td class="mono">${naira(i.price)}</td><td class="mono">${margin}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`
-      : `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${displayStock} ${esc(i.unit)}</td><td class="mono">${naira(i.price)}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`;
+      ? `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${i.service ? displayStock : displayStock+' '+esc(i.unit)}</td><td>${costCell}</td><td class="mono">${naira(i.price)}</td><td class="mono">${margin}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`
+      : `<tr><td>${photoCell(i)}</td><td>${nameCell}</td><td>${esc(i.category)}</td><td class="mono">${i.service ? displayStock : displayStock+' '+esc(i.unit)}</td><td class="mono">${naira(i.price)}</td><td>${status}</td><td style="white-space:nowrap;">${actionBtns}</td></tr>`;
   }).join('') || `<tr><td colspan="9" style="color:var(--muted);">No items match that search.</td></tr>`;
 }
 
@@ -813,7 +813,7 @@ function toggleServiceMode(){
 function submitNewItem(){
   const name = document.getElementById('newName').value.trim();
   const category = document.getElementById('newCategory').value;
-  const unit = document.getElementById('newUnit').value.trim() || 'piece';
+  const unit = document.getElementById('newIsService').checked ? '' : (document.getElementById('newUnit').value.trim() || 'piece');
   const price = Number(document.getElementById('newPrice').value);
   const isService = document.getElementById('newIsService').checked;
   const isBundle = !isService && document.getElementById('newIsBundle').checked;
@@ -1627,7 +1627,7 @@ function renderEditRow(i, isAdmin){
   return `<tr class="editor-row" style="background:#FBF8ED;"><td colspan="9"><div class="editfield-row">
     ${fld('Name',`<input type="text" id="editName" value="${esc(i.name)}">`)}
     ${fld('Category',`<select id="editCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===i.category?'selected':''}>${esc(c)}</option>`).join('')}</select>`)}
-    ${fld('Unit',`<input type="text" id="editUnit" value="${esc(i.unit||'')}">`)}
+    ${i.service ? '' : fld('Unit',`<input type="text" id="editUnit" value="${esc(i.unit||'')}">`)}
     ${fld('Selling price',`<input type="number" id="editPrice" value="${i.price}">`)}
     ${isAdmin ? fld('Cost price',`<input type="number" id="editCost" value="${i.cost==null?'':i.cost}" placeholder="—">`) : ''}
     ${plain ? fld('Stock',`<input type="number" id="editStock" value="${i.stock}">`) : `<input type="hidden" id="editStock" value="${i.service?0:i.stock}">`}
@@ -1664,7 +1664,7 @@ function saveEditItem(id){
   const money = v => (v==null||v==='') ? '—' : naira(v);
   set('name','name',name);
   set('category','category',val('editCategory')||item.category);
-  set('unit','unit',(val('editUnit')||'').trim()||'piece');
+  const unitEl = document.getElementById('editUnit'); if(unitEl) set('unit','unit',unitEl.value.trim()||'piece');
   set('price','price',newPrice,money);
   if(!item.bundle && !item.service) set('stock','stock',newStock);
   if(reorderRaw!==null) set('reorder','reorder',newReorder);
@@ -1693,4 +1693,100 @@ function deleteItem(id){
   persistItems();
   logActivity(`Deleted product "${it.name}"`);
   renderAll();
+   }
+/* ---- Reports: sales by category and branch ---- */
+function renderSalesBreakdown(){
+  if(role()!=='admin') return;
+  const tsb = document.getElementById('topSellersBody'), anchor = tsb && tsb.closest('.panel');
+  if(!anchor) return;
+  let panel = document.getElementById('catBranchPanel');
+  if(!panel){
+    panel = document.createElement('div'); panel.className = 'panel'; panel.id = 'catBranchPanel';
+    panel.innerHTML = `<h3>Sales by category and branch</h3>
+      <div class="searchbar"><select id="cbGroup"><option value="bc">Group by branch, then category</option><option value="cb">Group by category, then branch</option></select><select id="cbBranch"></select><select id="cbCategory"></select></div>
+      <div class="tablewrap"><table class="ledger"><thead><tr><th>Branch</th><th>Category</th><th>Qty sold</th><th>Revenue</th></tr></thead><tbody id="cbBody"></tbody></table></div>
+      <p class="helptext">Uses the date range above. Refunded sales are left out. Amounts are item prices before any discount or VAT on the whole sale.</p>`;
+    anchor.parentNode.insertBefore(panel, anchor);
+    ['cbGroup','cbBranch','cbCategory'].forEach(id=>panel.querySelector('#'+id).addEventListener('change', renderSalesBreakdown));
+  }
+  const NB = 'No branch', NC = 'Other', range = getSelectedRange(), rows = {}, bSeen = new Set(branches), cSeen = new Set(CATEGORIES);
+  sales.filter(s=>inRange(s,range) && !s.refunded).forEach(s=>s.lines.forEach(l=>{
+    const it = items.find(i=>i.name===l.name), br = (it && it.branch) || NB, ct = (it && it.category) || NC;
+    bSeen.add(br); cSeen.add(ct);
+    const k = br + '\u0001' + ct, r = rows[k] || (rows[k] = { br, ct, qty:0, rev:0 });
+    r.qty += l.qty; r.rev += l.qty * l.price;
+  }));
+  const fill = (id, first, vals)=>{
+    const sel = panel.querySelector('#'+id), keep = sel.value;
+    sel.innerHTML = `<option value="">${first}</option>` + Array.from(vals).sort().map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if(keep && Array.from(sel.options).some(o=>o.value===keep)) sel.value = keep;
+  };
+  fill('cbBranch','All branches',bSeen); fill('cbCategory','All categories',cSeen);
+  const g = panel.querySelector('#cbGroup').value, fb = panel.querySelector('#cbBranch').value, fc = panel.querySelector('#cbCategory').value;
+  const list = Object.values(rows).filter(r=>(!fb || r.br===fb) && (!fc || r.ct===fc));
+  const prim = g==='bc' ? 'br' : 'ct', groups = {};
+  list.forEach(r=>(groups[r[prim]] = groups[r[prim]] || []).push(r));
+  const order = Object.keys(groups).sort((a,b)=>((a===NB||a===NC)-(b===NB||b===NC)) || a.localeCompare(b));
+  let html = '', tq = 0, tr = 0;
+  order.forEach(k=>{
+    let q = 0, v = 0;
+    groups[k].sort((a,b)=>b.rev-a.rev).forEach(r=>{ q += r.qty; v += r.rev; html += `<tr><td>${esc(r.br)}</td><td>${esc(r.ct)}</td><td class="mono">${r.qty}</td><td class="mono">${naira(r.rev)}</td></tr>`; });
+    tq += q; tr += v;
+    html += `<tr style="font-weight:600;background:var(--paper);"><td colspan="2">Total for ${esc(k)}</td><td class="mono">${q}</td><td class="mono">${naira(v)}</td></tr>`;
+  });
+  if(order.length>1) html += `<tr style="font-weight:700;border-top:2px solid var(--ink);"><td colspan="2">All together</td><td class="mono">${tq}</td><td class="mono">${naira(tr)}</td></tr>`;
+  panel.querySelector('#cbBody').innerHTML = html || `<tr><td colspan="4" style="color:var(--muted);">No sales in this range.</td></tr>`;
+}
+{ const _renderReports = renderReports; renderReports = function(){ _renderReports(); renderSalesBreakdown(); }; }
+
+/* ---- Services have no unit ---- */
+function toggleServiceMode(){
+  const on = document.getElementById('newIsService').checked;
+  ['newStock','newReorder'].forEach(id=>{ const el=document.getElementById(id); el.disabled=on; if(on) el.value=''; el.closest('div').style.opacity = on?.4:1; });
+  const u = document.getElementById('newUnit'); u.closest('div').style.display = on ? 'none' : ''; if(on) u.value = '';
+  if(on){ document.getElementById('newIsBundle').checked=false; document.getElementById('bundleBuilder').style.display='none'; document.getElementById('newTrackBatches').checked=false; }
+  document.getElementById('newIsBundle').disabled=on; document.getElementById('newTrackBatches').disabled=on;
+}
+/* ---- Sales Log: filter by branch and category ---- */
+function saleLineGroup(l){
+  const it = items.find(i=>i.name===l.name);
+  return { br: (it && it.branch) || 'No branch', ct: (it && it.category) || 'Other' };
+}
+function filteredSalesLog(){
+  const range = getSelectedRange();
+  const fb = (document.getElementById('slBranch')||{}).value || '', fc = (document.getElementById('slCategory')||{}).value || '';
+  const hit = l => { const g = saleLineGroup(l); return (!fb || g.br===fb) && (!fc || g.ct===fc); };
+  const list = sales.filter(s=>inRange(s,range)).filter(s=>(!fb && !fc) || s.lines.some(hit));
+  const matchTotal = (fb||fc) ? list.filter(s=>!s.refunded).reduce((a,s)=>a + s.lines.filter(hit).reduce((b,l)=>b + l.qty*l.price, 0), 0) : 0;
+  return { list, fb, fc, matchTotal };
+}
+function renderSalesLogFilter(){
+  if(role()!=='admin') return;
+  const body = document.getElementById('salesLogBody'), wrap = body && body.closest('.tablewrap');
+  if(!wrap) return;
+  let bar = document.getElementById('slFilters');
+  if(!bar){
+    bar = document.createElement('div'); bar.id = 'slFilters'; bar.className = 'searchbar';
+    bar.innerHTML = `<select id="slBranch"></select><select id="slCategory"></select><span class="helptext" id="slNote" style="align-self:center;"></span>`;
+    wrap.parentNode.insertBefore(bar, wrap);
+    ['slBranch','slCategory'].forEach(id=>bar.querySelector('#'+id).addEventListener('change', renderSalesLogFilter));
+  }
+  const bs = new Set([...branches, ...items.map(i=>i.branch).filter(Boolean), 'No branch']);
+  const cs = new Set([...CATEGORIES, ...items.map(i=>i.category).filter(Boolean), 'Other']);
+  const fill = (id, first, vals)=>{
+    const sel = bar.querySelector('#'+id), keep = sel.value;
+    sel.innerHTML = `<option value="">${first}</option>` + Array.from(vals).sort().map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if(keep && Array.from(sel.options).some(o=>o.value===keep)) sel.value = keep;
+  };
+  fill('slBranch','All branches',bs); fill('slCategory','All categories',cs);
+  const { list, fb, fc, matchTotal } = filteredSalesLog();
+  body.innerHTML = list.slice().reverse().map(s=>`<tr><td class="mono">${esc(s.id)}</td><td>${esc(s.date)} ${esc(s.time)}</td><td>${esc(s.staff)}</td><td>${esc(s.payment)}</td><td class="mono">${naira(s.total)}</td><td>${s.refunded?'<span class="pill low">Refunded</span>':`<button class="btn sm ghost" onclick="refundSale('${s.id}')">Refund</button>`}</td></tr>`).join('')
+    || `<tr><td colspan="6" style="color:var(--muted);">No sales match.</td></tr>`;
+  document.getElementById('slNote').textContent = (fb||fc) ? `${list.length} sale${list.length===1?'':'s'} with these items. Those items came to ${naira(matchTotal)}, refunds left out.` : `${list.length} sale${list.length===1?'':'s'}.`;
+}
+{ const _renderReports2 = renderReports; renderReports = function(){ _renderReports2(); renderSalesLogFilter(); }; }
+function printSalesLog(){
+  const range = getSelectedRange(), { list, fb, fc } = filteredSalesLog();
+  const rows = list.slice().reverse().map(s=>[s.id, `${s.date} ${s.time}`, esc(s.staff), s.payment, naira(s.total)]);
+  showPrintableReport('Sales Log', `${range.from} → ${range.to}${fb?' · '+esc(fb):''}${fc?' · '+esc(fc):''}`, ['Receipt #','Time','Staff','Payment','Total'], rows);
 }
