@@ -263,3 +263,32 @@ SS.banner=function(){const L=SS.lic;let b=document.getElementById('ssExp');
  b.textContent=L.state==='grace'?`Subscription ended: ${L.graceLeft} grace day${L.graceLeft===1?'':'s'} left. Tap to renew`:`Subscription ends in ${L.daysLeft} day${L.daysLeft===1?'':'s'}. Tap to renew`;};
 {const gate0=SS.gate;SS.gate=async function(){const ok=await gate0();if(!ok)return ok;if(SS.lic&&SS.lic.today!==ssToday())SS.lic=SS.calc(SS.lic);SS.banner();return ok;};   // works offline too, from the saved expiry date
  const out0=logout;logout=function(){const b=document.getElementById('ssExp');if(b)b.remove();out0();};}
+
+/* ---------- Builder access: open the app with ?builder=1 ---------- */
+if(window.SS_BUILDER){
+ SS.dev=async function(){window.SALE_PREFIX='BLD';};
+ SS.gate=async function(){try{const d=await SS.api('license.status');SS.lic=d.license;}catch(e){}return true;};      // the builder is never locked out
+ {const raw=SS.api;SS.api=async function(a,b){                                                                    // nothing leaves this computer
+   if(a==='push')return{results:((b&&b.ops)||[]).map(o=>({opId:o.opId,status:'ok'})),serverTime:new Date().toISOString()};
+   if(a==='photo.put')return{marker:'builder'};
+   return raw(a,b);};}
+ renderAuthGate=function(){const card=document.getElementById('authCard');
+  card.innerHTML=`<img src="${window.SS_LOGO}" alt="" style="width:210px;max-width:80%;display:block;margin:0 auto 12px"><h2>Builder access</h2><p class="sub">Enter the builder key. You will see the whole app with the real data. View only.</p>
+   <form autocomplete="off" onsubmit="event.preventDefault();ssBuilderLogin();"><div class="form-row"><label>Builder key</label><input type="password" id="bKey" autocomplete="off"></div>
+   <div class="errtext" id="authErr"></div><button type="submit" class="btn gold" style="width:100%;margin-top:14px;">Open the app</button></form>`;
+  document.getElementById('authGate').style.visibility='visible';setTimeout(()=>{const f=document.getElementById('bKey');if(f)f.focus();},60);};
+ window.ssBuilderLogin=async function(){const err=document.getElementById('authErr'),key=document.getElementById('bKey').value.trim();
+  if(!key){err.textContent='Enter the builder key.';return;}
+  try{const d=await SS.api('builder.session',{builderKey:key}),salt=randomSaltHex(),ph=await hashSecret(key,salt);
+   const rec={id:'BUILDER',name:'Builder',role:'admin',passSalt:salt,passHash:ph,pinHash:ph,pinSalt:salt,active:true,token:d.token};
+   const i=users.findIndex(u=>u.id==='BUILDER');i<0?users.push(rec):users[i]=rec;persistUsers();currentUser=rec;
+   ssSet('ss_dev','BLD');SSLS.setItem('ch_tour_seen','1');enterApp();}
+  catch(e){err.textContent=e.message||'Could not open the builder view.';}};
+ const ssBldBar=()=>{if(document.getElementById('ssBld')||!currentUser)return;const b=document.createElement('div');b.id='ssBld';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9500;background:#b3261e;color:#fff;font:600 12px/1.3 sans-serif;padding:5px 10px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap';
+  b.innerHTML='BUILDER VIEW: real data, view only. What you try here stays on this computer and is never saved to the client. <button id="ssBldClr" style="font:inherit;padding:2px 8px;border-radius:6px;border:0;cursor:pointer">Clear and reload</button>';
+  document.body.append(b);document.body.style.paddingTop='30px';
+  document.getElementById('ssBldClr').onclick=()=>{if(confirm('Clear everything the builder view has on this computer and load it fresh from the live system?')){SSLS.clear();sessionStorage.clear();location.reload();}};};
+ {const e0=enterApp;enterApp=function(){e0();ssBldBar();};}
+ if(currentUser)ssBldBar();else renderAuthGate();
+}
