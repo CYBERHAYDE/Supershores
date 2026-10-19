@@ -221,8 +221,8 @@ submitLogin=ssBusy(submitLogin,'Signing in...');submitRegisterAdmin=ssBusy(submi
   if(k!=='Enter'||t.tagName!=='INPUT'||['checkbox','radio','file','button'].includes(t.type)||t.closest('form'))return;
   if(t.id==='saleSearch'){                                            // scanner gun or keyboard: Enter adds the item
    e.preventDefault();const q=t.value.trim(),ql=q.toLowerCase();if(!q)return;
-   let m=items.find(i=>i.barcode&&i.barcode===q);
-   if(!m){const r=items.filter(i=>i.name.toLowerCase().includes(ql)||(i.barcode||'').includes(q));if(r.length===1)m=r[0];}
+   let m=items.find(i=>i.barcode&&String(i.barcode)===q);
+   if(!m){const r=items.filter(i=>String(i.name).toLowerCase().includes(ql)||String(i.barcode||'').includes(q));if(r.length===1)m=r[0];}
    if(!m)return;
    if(itemAvailable(m)<1)return alert(m.name+' is out of stock.');
    addToCart(m.id);t.value='';renderSaleSearch();t.focus();return;}
