@@ -466,7 +466,7 @@ function renderInventory(){
   const q = document.getElementById('invSearch').value.toLowerCase();
   const branchFilter = document.getElementById('invBranch').value;
   const cat = document.getElementById('invCategory').value;
-  const rows = items.filter(i => (!cat || i.category===cat) && (!branchFilter || i.branch===branchFilter) && (i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.barcode||'').includes(q)));
+  const rows = items.filter(i => (!cat || i.category===cat) && (!branchFilter || i.branch===branchFilter) && (String(i.name).toLowerCase().includes(q) || String(i.category).toLowerCase().includes(q) || String(i.barcode||'').includes(q)));
   const isAdmin = role()==='admin';
   document.getElementById('invHead').innerHTML = isAdmin
     ? `<tr><th></th><th>${t('colItem')}</th><th>${t('colCategory')}</th><th>${t('colStock')}</th><th>${t('colCost')}</th><th>${t('colSellPrice')}</th><th>${t('colMargin')}</th><th>${t('colStatus')}</th><th></th></tr>`
@@ -844,7 +844,7 @@ function submitNewItem(){
 /* ================= Register Sale ================= */
 function renderSaleSearch(){
   const q = document.getElementById('saleSearch').value.toLowerCase();
-  const results = q.length===0 ? [] : items.filter(i=>i.name.toLowerCase().includes(q) || (i.barcode||'').includes(q)).slice(0,6);
+  const results = q.length===0 ? [] : items.filter(i=>String(i.name).toLowerCase().includes(q) || String(i.barcode||'').includes(q)).slice(0,6);
   document.getElementById('saleSearchResults').innerHTML = results.map(i=>`
     <div class="add-row"><div class="left">${photoCell(i)}<div class="info"><b>${esc(i.name)}</b><br><span class="stock">${i.service ? 'Service' : itemAvailable(i)+' '+esc(i.unit)+' in stock'} · ${naira(i.price)}</span></div></div>
     <button class="btn sm gold" onclick="addToCart(${i.id})" ${itemAvailable(i)<1?'disabled':''}>Add</button></div>`).join('')
