@@ -1620,28 +1620,35 @@ function newBarcode(){
 
 /* ---- Edit a product: every field, plus Delete ---- */
 function renderEditRow(i, isAdmin){
-  const fld = (label, html)=>`<div class="editfield"><label>${label}</label>${html}</div>`;
+  const fld = (label, html, cls)=>`<div class="editfield${cls?' '+cls:''}"${cls&&i.service?' style="display:none"':''}><label>${label}</label>${html}</div>`;
   const cats = Array.from(new Set([...CATEGORIES, i.category].filter(Boolean)));
   const brs = Array.from(new Set([...branches, i.branch].filter(Boolean)));
-  const plain = !i.service && !i.bundle;
+  const canSwitch = isAdmin && !i.bundle;
+  const po = (label, html)=> canSwitch ? fld(label, html, 'prodonly') : (i.service ? '' : fld(label, html));
   return `<tr class="editor-row" style="background:#FBF8ED;"><td colspan="9"><div class="editfield-row">
     ${fld('Name',`<input type="text" id="editName" value="${esc(i.name)}">`)}
+    ${canSwitch ? fld('Type',`<select id="editKind" onchange="editKindChanged()"><option value="product" ${i.service?'':'selected'}>Stock item</option><option value="service" ${i.service?'selected':''}>Service</option></select>`) : ''}
     ${fld('Category',`<select id="editCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===i.category?'selected':''}>${esc(c)}</option>`).join('')}</select>`)}
-    ${i.service ? '' : fld('Unit',`<input type="text" id="editUnit" value="${esc(i.unit||'')}">`)}
+    ${po('Unit',`<input type="text" id="editUnit" value="${esc(i.unit||'')}">`)}
     ${fld('Selling price',`<input type="number" id="editPrice" value="${i.price}">`)}
     ${isAdmin ? fld('Cost price',`<input type="number" id="editCost" value="${i.cost==null?'':i.cost}" placeholder="—">`) : ''}
-    ${plain ? fld('Stock',`<input type="number" id="editStock" value="${i.stock}">`) : `<input type="hidden" id="editStock" value="${i.service?0:i.stock}">`}
-    ${i.service ? '' : fld('Reorder level',`<input type="number" id="editReorder" value="${i.reorder==null?'':i.reorder}">`)}
+    ${canSwitch ? fld('Stock',`<input type="number" id="editStock" value="${i.service?0:i.stock}">`, 'prodonly') : `<input type="hidden" id="editStock" value="${i.service?0:i.stock}">`}
+    ${po('Reorder level',`<input type="number" id="editReorder" value="${i.reorder==null?'':i.reorder}">`)}
     ${fld('Barcode',`<input type="text" id="editBarcode" value="${esc(i.barcode||'')}">`)}
-    ${i.service ? '' : fld('Expiry date',`<input type="date" id="editExpiry" value="${esc(i.expiry||'')}">`)}
+    ${po('Expiry date',`<input type="date" id="editExpiry" value="${esc(i.expiry||'')}">`)}
     ${fld('Branch',`<select id="editBranch"><option value="">None</option>${brs.map(b=>`<option value="${esc(b)}" ${b===i.branch?'selected':''}>${esc(b)}</option>`).join('')}</select>`)}
-    ${plain ? fld('Supplier',`<input type="text" id="editSupplier" value="${esc(i.supplier||'')}">`) : ''}
+    ${canSwitch ? fld('Supplier',`<input type="text" id="editSupplier" value="${esc(i.supplier||'')}">`, 'prodonly') : ''}
   </div>
   <div class="editrow-actions" style="margin-top:12px;">
     <button class="btn sm gold" onclick="saveEditItem(${i.id})">${t('save')}</button>
     <button class="btn sm ghost" onclick="cancelEditItem()">${t('cancel')}</button>
     ${isAdmin ? `<button class="btn sm ghost" style="color:#b3261e;margin-left:auto;" onclick="deleteItem(${i.id})">Delete product</button>` : ''}
   </div></td></tr>`;
+}
+function editKindChanged(){
+  const svc = document.getElementById('editKind').value==='service';
+  document.querySelectorAll('.editor-row .prodonly').forEach(el=>{ el.style.display = svc ? 'none' : ''; });
+  if(!svc){ const s=document.getElementById('editStock'); if(s) s.focus(); }
 }
 function saveEditItem(id){
   const item = items.find(x=>x.id===id); if(!item) return;
@@ -1657,21 +1664,21 @@ function saveEditItem(id){
   if(isNaN(newStock) || newStock<0){ alert('Stock cannot be negative.'); return; }
   if(isNaN(newReorder) || newReorder<0){ alert('Reorder level cannot be negative.'); return; }
   if(barcode && items.some(o=>o.id!==id && o.barcode===barcode)){ alert('Another product already uses that barcode.'); return; }
-  if(!barcode) barcode = newBarcode();
+    if(!barcode) barcode = newBarcode();   const kindEl = document.getElementById('editKind');   const toService = kindEl ? kindEl.value==='service' : !!item.service;   const switching = !item.bundle && toService !== !!item.service;   if(switching && toService && item.stock>0 && !confirm(`Turn "${item.name}" into a service? Its ${item.stock} in stock will be cleared and it will no longer be counted or reordered.`)) return;
   const changes = [];
   const show = v => (v==null||v==='') ? '—' : v;
   const set = (label, key, nv, fmt)=>{ const ov=item[key]; if(String(ov==null?'':ov)!==String(nv==null?'':nv)){ const f=fmt||show; changes.push(`${label} ${f(ov)} → ${f(nv)}`); item[key]=nv; } };
   const money = v => (v==null||v==='') ? '—' : naira(v);
   set('name','name',name);
   set('category','category',val('editCategory')||item.category);
-  const unitEl = document.getElementById('editUnit'); if(unitEl) set('unit','unit',unitEl.value.trim()||'piece');
+  const unitEl = document.getElementById('editUnit'); if(unitEl && !item.service) set('unit','unit',unitEl.value.trim()||'piece');
   set('price','price',newPrice,money);
   if(!item.bundle && !item.service) set('stock','stock',newStock);
-  if(reorderRaw!==null) set('reorder','reorder',newReorder);
+  if(reorderRaw!==null && !item.service) set('reorder','reorder',newReorder);
   set('barcode','barcode',barcode);
-  const expEl = document.getElementById('editExpiry'); if(expEl) set('expiry','expiry',expEl.value||null);
+  const expEl = document.getElementById('editExpiry'); if(expEl && !item.service) set('expiry','expiry',expEl.value||null);
   set('branch','branch',val('editBranch')||null);
-  const supEl = document.getElementById('editSupplier'); if(supEl) set('supplier','supplier',supEl.value.trim()||null);
+  const supEl = document.getElementById('editSupplier'); if(supEl && !item.service) set('supplier','supplier',supEl.value.trim()||null);
   const costEl = document.getElementById('editCost');
   if(role()==='admin' && costEl) set('cost','cost',costEl.value==='' ? null : Number(costEl.value),money);
   persistItems();
