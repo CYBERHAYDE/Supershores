@@ -14,7 +14,7 @@ SY.chip=m=>{let c=document.getElementById('syChip');if(!c){c=document.createElem
  const n=syQ().length,f=ssGet('ss_failed',[]).length;c.textContent=m||(f?`${f} refused, tap to see`:!navigator.onLine?`Offline${n?', '+n+' waiting':''}`:n?`${n} waiting to sync`:'Synced');c.style.color=f?'#b3261e':'#333';c.classList.toggle('syncing',m==='Syncing...');c.hidden=!currentUser;};
 
 /* ---- 1. Work out what changed, after every save ---- */
-SY.sids=()=>{const d=syDev();items.forEach(i=>{if(!i.sid)i.sid='I-'+d+'-'+i.id;});debtors.forEach(x=>{if(!x.sid)x.sid='C-'+d+'-'+syNum(x.id);});expenses.forEach(e=>{if(!e.sid)e.sid='E-'+d+'-'+syNum(e.id);});};
+SY.sids=()=>{const d=syDev(),u=()=>Math.random().toString(36).slice(2,6);items.forEach(i=>{if(!i.sid)i.sid='I-'+d+'-'+i.id+'-'+u();});debtors.forEach(x=>{if(!x.sid)x.sid='C-'+d+'-'+syNum(x.id);});expenses.forEach(e=>{if(!e.sid)e.sid='E-'+d+'-'+syNum(e.id)+'-'+u();});};   // the random tail stops a new item or expense from reusing the ID of one that was deleted
 SY.blob=()=>{const x=Object.assign({},settings);delete x.logo;delete x.logoHave;delete x.logoWant;return JSON.stringify({s:x,branches});};   // the logo travels separately, so the settings stay small
 const syLogo=()=>settings.logo&&settings.logo!==window.SS_LOGO?settings.logo.length+':'+settings.logo.slice(-20):'';
 const syPh=i=>i.photo?i.photo.length+':'+i.photo.slice(-20):'';
@@ -33,12 +33,12 @@ SY.diff=()=>{if(SY.merging||!currentUser||!syDev())return;SY.sids();const old=ss
   if(currentUser.role==='admin'&&i.photo&&String(i.photo).startsWith('data:')&&(!o||o.ph!==syPh(i)))photos.push({itemId:i.sid,dataUrl:i.photo});
   if(!o){ops.push(['item.create',{itemId:i.sid,name:i.name,barcode:i.barcode||'',category:i.category||'General',unit:i.unit||'piece',cost:+i.cost||0,price:i.price,kind:i.service?'service':undefined,openingStock:(i.bundle||i.service)?0:(+i.stock||0),reorder:+i.reorder||0,expiry:i.expiry||'',branch:i.branch||'',trackBatches:!!i.trackBatches,batch:i.trackBatches&&!i.bundle&&+i.stock>0?{code:'OPENING',expiry:i.expiry||'',dateAdded:todayIso()}:undefined,bundle:i.bundle?i.bundle.map(c=>({itemId:(byId(c.itemId)||{}).sid,qty:c.qty})):undefined}]);return;}
   const ch={};['name','barcode','category','unit','cost','price','reorder','expiry','branch','trackBatches'].forEach(f=>{const a=f==='trackBatches'?!!i[f]:i[f]??'',b=f==='trackBatches'?!!o[f]:o[f]??'';if(String(a)!==String(b))ch[f]=a;});
-  if(!!i.service!==!!o.service)ch.kind=i.service?'service':'good';   
+  if(!!i.service!==!!o.service)ch.kind=i.service?'service':'good';
   if(Object.keys(ch).length)ops.push(['item.update',{itemId:i.sid,changes:ch}]);
   if(!i.bundle&&!i.service){const un=(+i.stock||0)-(+o.stock||0)-(delta[i.id]||0);   // whatever the sales and refunds do not explain was a restock or correction
    if(un<0)SY.adjBatch=SY.adj[i.id];
    if(un>0)ops.push(['stock.in',{itemId:i.sid,qty:un,supplier:i.supplier||'',batch:i.trackBatches?newBatch(i,o):undefined}]);else if(un<0){ops.push(['stock.out',{itemId:i.sid,qty:-un,reason:'Adjustment',direction:'OUT',note:'Changed in the app',batch:i.trackBatches&&SY.adj[i.id]?{code:SY.adj[i.id]}:undefined}]);delete SY.adj[i.id];}}});
- newSales.forEach(s=>{const c=s.payment==='Credit'?debtors.find(d=>d.name.toLowerCase()===String(s.customer||'').toLowerCase().trim()):null,dc=s.discount;
+ newSales.forEach(s=>{const c=s.payment==='Credit'?debtors.find(d=>String(d.name).toLowerCase()===String(s.customer||'').toLowerCase().trim()):null,dc=s.discount;
   ops.push(['sale.create',{saleId:s.id,lines:s.lines.map(l=>({itemId:(lineItem(l)||{}).sid,qty:l.qty})),payment:s.payment,customerId:c?c.sid:undefined,voucher:dc&&dc.voucher||undefined,
    discount:dc&&!dc.voucher&&currentUser.role==='admin'?{amount:dc.amount,reason:dc.reason||'Admin discount'}:undefined}]);});
  refunded.forEach(s=>ops.push(['sale.void',{saleId:s.id,reason:'Refunded in the app'}]));
@@ -104,8 +104,8 @@ SY.mSettings=s=>{const raw=s&&s.AppSettingsJSON;if(!raw||raw===SY.blob())return;
  if(o.s.logoVer&&o.s.logoVer!==settings.logoHave)settings.logoWant=o.s.logoVer;
  persistSettings();persistBranches();applyBrandColors();updateBrandMark();};
 SY.mDebtors=list=>{const by={};debtors.forEach(d=>{if(d.sid)by[d.sid]=d;});let n=Math.max(0,...debtors.map(d=>syNum(d.id)));
- list.forEach(x=>{let d=by[x.CustomerID];if(!d){d={id:'CU-'+String(++n).padStart(3,'0'),sid:x.CustomerID,history:[]};debtors.push(d);}d.name=x.Name;d.phone=x.Phone||'';d.balance=+x.Balance||0;});};
-SY.mSales=p=>{const lines={},cust={},dn={};debtors.forEach(d=>{if(d.sid)cust[d.sid]=d.name;});p.saleItems.forEach(l=>{(lines[l.SaleID]=lines[l.SaleID]||[]).push({name:l.ItemName,qty:+l.Quantity,price:+l.UnitPrice});});
+ list.forEach(x=>{let d=by[x.CustomerID];if(!d){d={id:'CU-'+String(++n).padStart(3,'0'),sid:x.CustomerID,history:[]};debtors.push(d);}d.name=String(x.Name??'');d.phone=String(x.Phone||'');d.balance=+x.Balance||0;});};
+SY.mSales=p=>{const lines={},cust={},dn={};debtors.forEach(d=>{if(d.sid)cust[d.sid]=d.name;});p.saleItems.forEach(l=>{(lines[l.SaleID]=lines[l.SaleID]||[]).push({name:l.ItemName,qty:+l.Quantity,price:+l.UnitPrice,itemId:(items.find(i=>i.sid===l.ItemID)||{}).id,cost:(l.UnitCost===undefined||l.UnitCost==='')?null:+l.UnitCost});});
  const day=todayIso();
  p.sales.forEach(x=>{if(sales.some(s=>s.id===x.SaleID))return;const d=new Date(x.Timestamp),iso=localIso(d);
   sales.push({id:x.SaleID,date:iso===day?'Today':d.toLocaleDateString('en-NG',{weekday:'short'}),isoDate:iso,time:d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),staff:`${x.StaffName} (${x.StaffID})`,payment:x.PaymentMethod,
@@ -114,7 +114,7 @@ SY.mSales=p=>{const lines={},cust={},dn={};debtors.forEach(d=>{if(d.sid)cust[d.s
  p.voids.forEach(v=>{const s=sales.find(x=>x.id===v.SaleID);if(s)s.refunded=true;});};
 SY.mExp=list=>{let n=Math.max(0,...expenses.map(e=>syNum(e.id)));
  list.forEach(x=>{if(x.ReversesExpenseID){expenses=expenses.filter(e=>e.sid!==x.ReversesExpenseID);return;}if(expenses.some(e=>e.sid===x.ExpenseID))return;
-  expenses.push({id:'EX-'+String(++n).padStart(3,'0'),sid:x.ExpenseID,category:x.Category,amount:+x.Amount,isoDate:x.Date,loggedBy:x.LoggedBy,note:x.Notes});});};
+  expenses.push({id:'EX-'+String(++n).padStart(3,'0'),sid:x.ExpenseID,category:x.Category,amount:+x.Amount,isoDate:x.Date,loggedBy:(users.find(z=>z.id===x.LoggedBy)?users.find(z=>z.id===x.LoggedBy).name+' ('+x.LoggedBy+')':x.LoggedBy),note:x.Notes});});};
 SY.mAudit=rows=>{const all=ssGet('ss_audit',[]).concat(rows.map(r=>({t:r.Timestamp,u:`${r.StaffName} (${r.StaffID})`,r:r.RoleAtTime==='owner'?'admin':(r.RoleAtTime||'—'),a:r.Action+(r.NewValue!==''&&r.OldValue!==''?` (${r.OldValue} to ${r.NewValue})`:r.NewValue!==''?` (${r.NewValue})`:'')+(r.Details?': '+r.Details:'')}))).slice(-600);
  ssSet('ss_audit',all);activityLog=all.slice().sort((a,b)=>a.t<b.t?-1:1).map(x=>({time:new Date(x.t).toLocaleString('en-NG',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}),user:x.u,role:x.r,action:x.a}));};
 
