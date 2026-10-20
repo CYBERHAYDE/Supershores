@@ -1664,13 +1664,20 @@ function saveEditItem(id){
   if(isNaN(newStock) || newStock<0){ alert('Stock cannot be negative.'); return; }
   if(isNaN(newReorder) || newReorder<0){ alert('Reorder level cannot be negative.'); return; }
   if(barcode && items.some(o=>o.id!==id && o.barcode===barcode)){ alert('Another product already uses that barcode.'); return; }
-   if(!barcode) barcode = newBarcode();   const kindEl = document.getElementById('editKind');   const toService = kindEl ? kindEl.value==='service' : !!item.service;   const switching = !item.bundle && toService !== !!item.service;   
-   if(switching && toService && items.some(b=>b.bundle && b.bundle.some(c=>c.itemId===item.id))){ alert('This item is part of a bundle, so it cannot become a service.'); return; }
-   if(switching && toService && item.stock>0 && !confirm(`Turn "${item.name}" into a service? Its ${item.stock} in stock will be cleared and it will no longer be counted or reordered.`)) return;
+  if(!barcode) barcode = newBarcode();
+  const kindEl = document.getElementById('editKind');
+  const toService = kindEl ? kindEl.value==='service' : !!item.service;
+  const switching = !item.bundle && toService !== !!item.service;
+  if(switching && toService && items.some(b=>b.bundle && b.bundle.some(c=>c.itemId===item.id))){ alert('This item is part of a bundle, so it cannot become a service.'); return; }
+  if(switching && toService && item.stock>0 && !confirm(`Turn "${item.name}" into a service? Its ${item.stock} in stock will be cleared and it will no longer be counted or reordered.`)) return;
   const changes = [];
   const show = v => (v==null||v==='') ? '—' : v;
   const set = (label, key, nv, fmt)=>{ const ov=item[key]; if(String(ov==null?'':ov)!==String(nv==null?'':nv)){ const f=fmt||show; changes.push(`${label} ${f(ov)} → ${f(nv)}`); item[key]=nv; } };
   const money = v => (v==null||v==='') ? '—' : naira(v);
+  if(switching){
+    if(toService){ item.service = true; item.stock = 0; item.reorder = 0; item.expiry = null; item.supplier = null; item.trackBatches = false; item.batches = null; changes.push('type Stock item → Service'); }
+    else { item.service = false; item.stock = 0; changes.push('type Service → Stock item'); }
+  }
   set('name','name',name);
   set('category','category',val('editCategory')||item.category);
   const unitEl = document.getElementById('editUnit'); if(unitEl && !item.service) set('unit','unit',unitEl.value.trim()||'piece');
