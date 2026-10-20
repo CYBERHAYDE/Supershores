@@ -33,7 +33,7 @@ SY.diff=()=>{if(SY.merging||!currentUser||!syDev())return;SY.sids();const old=ss
   if(currentUser.role==='admin'&&i.photo&&String(i.photo).startsWith('data:')&&(!o||o.ph!==syPh(i)))photos.push({itemId:i.sid,dataUrl:i.photo});
   if(!o){ops.push(['item.create',{itemId:i.sid,name:i.name,barcode:i.barcode||'',category:i.category||'General',unit:i.unit||'piece',cost:+i.cost||0,price:i.price,kind:i.service?'service':undefined,openingStock:(i.bundle||i.service)?0:(+i.stock||0),reorder:+i.reorder||0,expiry:i.expiry||'',branch:i.branch||'',trackBatches:!!i.trackBatches,batch:i.trackBatches&&!i.bundle&&+i.stock>0?{code:'OPENING',expiry:i.expiry||'',dateAdded:todayIso()}:undefined,bundle:i.bundle?i.bundle.map(c=>({itemId:(byId(c.itemId)||{}).sid,qty:c.qty})):undefined}]);return;}
   const ch={};['name','barcode','category','unit','cost','price','reorder','expiry','branch','trackBatches'].forEach(f=>{const a=f==='trackBatches'?!!i[f]:i[f]??'',b=f==='trackBatches'?!!o[f]:o[f]??'';if(String(a)!==String(b))ch[f]=a;});
-  if(o.service!==undefined&&!!i.service!==!!o.service)ch.kind=i.service?'service':'good';   
+  if(!!i.service!==!!o.service)ch.kind=i.service?'service':'good';   
   if(Object.keys(ch).length)ops.push(['item.update',{itemId:i.sid,changes:ch}]);
   if(!i.bundle&&!i.service){const un=(+i.stock||0)-(+o.stock||0)-(delta[i.id]||0);   // whatever the sales and refunds do not explain was a restock or correction
    if(un<0)SY.adjBatch=SY.adj[i.id];
