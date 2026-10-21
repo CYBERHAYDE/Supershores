@@ -162,7 +162,7 @@ AP.renderLog = () => {
   const table = body.closest('table'), wrap = table.closest('.tablewrap');
   table.classList.toggle('ap-on', AP.selMode);
   const hr = table.querySelector('thead tr');
-  if (hr && !hr.querySelector('.ap-c')) hr.insertAdjacentHTML('afterbegin', '<th class="ap-c"></th>');
+  if (hr && !hr.querySelector('.ap-c')) hr.insertAdjacentHTML('afterbegin', '<th class="ap-c"></th>');   if (hr && !hr.querySelector('.ap-items')) { const th = [...hr.children].find(x => /receipt/i.test(x.textContent)); if (th) th.insertAdjacentHTML('afterend', '<th class="ap-items">Items</th>'); }
   if (!document.getElementById('apBar')) { const bar = document.createElement('div'); bar.id = 'apBar'; bar.className = 'searchbar'; wrap.parentNode.insertBefore(bar, wrap); }
   AP.bar();
   const list = filteredSalesLog().list.slice().reverse(); AP.shown = list;
@@ -172,7 +172,7 @@ AP.renderLog = () => {
       + ` <button class="btn sm ghost" onclick="AP.reprint('${esc(s.id)}')">🖨 Receipt</button>`
       + (pend ? ' <span class="pill low">Discount pending</span>' : rej ? ' <span class="pill low">Discount rejected</span>' : '');
     return `<tr><td class="ap-c"><input type="checkbox" ${AP.sel.has(s.id) ? 'checked' : ''} ${s.refunded ? 'disabled' : ''} onchange="AP.pick('${esc(s.id)}',this.checked)"></td><td class="mono">${esc(s.id)}</td><td>${esc(saleDay(s))} ${esc(s.time)}</td><td>${esc(s.staff)}</td><td>${esc(s.payment)}</td><td class="mono">${naira(s.total)}</td><td>${act}</td></tr>`;
-  }).join('') || '<tr><td colspan="7" style="color:var(--muted);">No sales match.</td></tr>';
+  }).join('') || '<tr><td colspan="8" style="color:var(--muted);">No sales match.</td></tr>';
 };
 { const _rr = renderReports; renderReports = function () { _rr(); AP.renderLog(); }; }
 
@@ -240,5 +240,5 @@ AP.invoice = () => {
   logActivity(`Printed invoice ${no} for ${list.map(s => s.id).join(', ')}`);
 };
 
-/* first look after sign-in */
+/* ---------- 6. Type the quantity in the cart ---------- */ AP.setQty = (id, v) => {   const line = cart.find(c => c.id === id), item = items.find(i => i.id === id);   if (!line || !item) return;   const n = Math.floor(Number(v)), max = itemAvailable(item);   if (v === '' || isNaN(n)) return renderCart();   if (n <= 0 || max < 1) cart = cart.filter(c => c.id !== id);   else if (n > max) { line.qty = max; AP.toast(`Only ${max} in stock.`); }   else line.qty = n;   renderCart(); };  /* first look after sign-in */
 setTimeout(() => { if (currentUser) { AP.refresh(); AP.loadPending(); } }, 4000);
