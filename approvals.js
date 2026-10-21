@@ -157,6 +157,14 @@ AP.bar = () => {
     ? `<button class="btn sm gold" onclick="AP.toggleMode()">✔ Done selecting</button><button class="btn sm ghost" onclick="AP.all()">Select all shown</button><button class="btn sm ghost" onclick="AP.none()">Clear</button><span class="helptext" style="margin:0">${n} selected</span><button class="btn sm ghost" ${n ? '' : 'disabled'} onclick="AP.combined()">🧾 Combined receipt</button><button class="btn sm ghost" ${n ? '' : 'disabled'} onclick="AP.invoice()">📄 Invoice</button>`
     : `<button class="btn sm ghost" onclick="AP.toggleMode()">☑ Select sales</button><span class="helptext" style="margin:0">Tick several sales to print one combined receipt or an invoice. Use Receipt on any row to reprint it.</span>`;
 };
+AP.looksLikeCode = v => /^(I-[A-Za-z0-9]+-\d+(-[A-Za-z0-9]+)?|[A-Z]{1,3}-[A-Z0-9]{6,}|\d{6,})$/.test(String(v == null ? '' : v).trim());
+AP.itemName = l => {   // the real item or service name for a sale line, even if the line only holds an ID or barcode
+  const raw = String(l.name == null ? '' : l.name).trim();
+  if (raw && !AP.looksLikeCode(raw)) return raw;
+  const hit = (l.itemId != null && items.find(i => i.id === l.itemId)) || items.find(i => i.sid === raw || String(i.barcode) === raw);
+  return (hit && hit.name) ? String(hit.name) : (raw || 'Item');
+};
+AP.itemsText = s => (s.lines || []).map(l => AP.itemName(l) + (l.qty > 1 ? ' ×' + l.qty : '')).join(', ');
 AP.renderLog = () => {
   const body = document.getElementById('salesLogBody'); if (!body) return;
   const table = body.closest('table'), wrap = table.closest('.tablewrap');
@@ -171,9 +179,10 @@ AP.renderLog = () => {
     const act = (s.refunded ? '<span class="pill low">Refunded</span>' : `<button class="btn sm ghost" onclick="refundSale('${esc(s.id)}')">Refund</button>`)
       + ` <button class="btn sm ghost" onclick="AP.reprint('${esc(s.id)}')">🖨 Receipt</button>`
       + (pend ? ' <span class="pill low">Discount pending</span>' : rej ? ' <span class="pill low">Discount rejected</span>' : '');
-    return `<tr><td class="ap-c"><input type="checkbox" ${AP.sel.has(s.id) ? 'checked' : ''} ${s.refunded ? 'disabled' : ''} onchange="AP.pick('${esc(s.id)}',this.checked)"></td><td class="mono">${esc(s.id)}</td><td>${esc(saleDay(s))} ${esc(s.time)}</td><td>${esc(s.staff)}</td><td>${esc(s.payment)}</td><td class="mono">${naira(s.total)}</td><td>${act}</td></tr>`;
+    return `<tr><td class="ap-c"><input type="checkbox" ${AP.sel.has(s.id) ? 'checked' : ''} ${s.refunded ? 'disabled' : ''} onchange="AP.pick('${esc(s.id)}',this.checked)"></td><td class="mono">${esc(s.id)}</td><td style="max-width:260px;white-space:normal;line-height:1.35">${esc(AP.itemsText(s)) || '<span style="color:var(--muted)">—</span>'}</td><td>${esc(saleDay(s))} ${esc(s.time)}</td><td>${esc(s.staff)}</td><td>${esc(s.payment)}</td><td class="mono">${naira(s.total)}</td><td>${act}</td></tr>`;
   }).join('') || '<tr><td colspan="8" style="color:var(--muted);">No sales match.</td></tr>';
 };
+{ const _rsl = renderSalesLogFilter; renderSalesLogFilter = function () { _rsl(); AP.renderLog(); }; }   // the branch and category filters redraw the table through here
 { const _rr = renderReports; renderReports = function () { _rr(); AP.renderLog(); }; }
 
 /* ---------- 5. Combined receipt and invoice ---------- */
