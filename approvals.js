@@ -19,7 +19,7 @@ AP.disc = s => (s.discount ? +s.discount.amount || 0 : 0);
 AP.gross = s => (+s.subtotal || 0) + AP.disc(s);          // line total before any discount
 (function css() {
   const st = document.createElement('style');
-  st.textContent = '.ap-c{display:none}.ap-on .ap-c{display:table-cell;width:28px}#apBar{gap:6px;flex-wrap:wrap;align-items:center}#apChip{position:fixed;left:8px;bottom:104px;z-index:61;font:600 12px sans-serif;padding:6px 12px;border-radius:99px;border:1px solid #c9a227;background:#fff7dc;color:#5c4400;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}.ap-req{border:1px solid var(--paper-line,#ddd);border-radius:10px;padding:10px;margin:8px 0;text-align:left}.ap-req small{color:var(--muted,#666)}';
+  st.textContent = '.ap-c{display:none}.ap-on .ap-c{display:table-cell;width:28px}#salesLogBody td{vertical-align:top}#apBar{gap:6px;flex-wrap:wrap;align-items:center}#apChip{position:fixed;left:8px;bottom:104px;z-index:61;font:600 12px sans-serif;padding:6px 12px;border-radius:99px;border:1px solid #c9a227;background:#fff7dc;color:#5c4400;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}.ap-req{border:1px solid var(--paper-line,#ddd);border-radius:10px;padding:10px;margin:8px 0;text-align:left}.ap-req small{color:var(--muted,#666)}';
   document.head.append(st);
 })();
 
@@ -106,11 +106,18 @@ AP.loadPending = async () => {
   try { AP.pending = await SS.api('discount.pending', { token: currentUser.token }); } catch (e) { return; }
   AP.chip();
 };
+AP.viewActive = () => { const v = document.getElementById('view-approvals'); return !!(v && v.classList.contains('active')); };
+AP.badge = (n, admin) => {
+  const t = document.getElementById('tabApprovals'), m = document.getElementById('moreApprovals');
+  if (t) t.hidden = !admin; if (m) m.hidden = !admin;
+  ['apBadgeTab', 'apBadgeMore', 'apBadgeDot'].forEach(id => { const b = document.getElementById(id); if (b) { b.hidden = !(admin && n > 0); b.textContent = n > 9 ? '9+' : n; } });
+};
 AP.chip = () => {
   let c = document.getElementById('apChip');
-  const n = AP.pending.length, show = currentUser && currentUser.role === 'admin' && n > 0;
+  const n = AP.pending.length, admin = !!(currentUser && currentUser.role === 'admin'), show = admin && n > 0 && !AP.viewActive();
+  AP.badge(n, admin); AP.renderView();
   if (!show) { if (c) c.hidden = true; return; }
-  if (!c) { c = document.createElement('button'); c.id = 'apChip'; c.onclick = AP.open; document.body.append(c); }
+  if (!c) { c = document.createElement('button'); c.id = 'apChip'; c.onclick = () => switchView('approvals'); document.body.append(c); }
   c.hidden = false; c.textContent = `⏳ ${n} discount${n > 1 ? 's' : ''} waiting for you`;
 };
 AP.open = () => {
@@ -133,9 +140,9 @@ AP.decide = async (saleId, approve, btn) => {
     if (s) AP.save(() => AP.apply(s, { status: r.status, discount: r.discount, subtotal: r.subtotal, vat: r.vat, total: r.total, reason: p ? p.reason : '', authorizedBy: currentUser.id }));
     logActivity(`${approve ? 'Approved' : 'Rejected'} discount on ${saleId}`);
     AP.toast(approve ? `Approved. ${saleId} is now ${naira(r.total)}.` : `Rejected. ${saleId} stays at full price.`);
-    AP.pending = AP.pending.filter(x => x.saleId !== saleId); AP.chip(); AP.pending.length ? AP.open() : ssClose(); renderAll();
+    AP.pending = AP.pending.filter(x => x.saleId !== saleId); AP.chip(); AP.after(); renderAll();
   } catch (e) {
-    alert(e.message); await AP.loadPending(); AP.pending.length ? AP.open() : ssClose();
+    alert(e.message); await AP.loadPending(); AP.after();
   }
 };
 { const _pull = SY.pull; SY.pull = async function () { const r = await _pull.apply(SY, arguments); AP.refresh(); AP.loadPending(); return r; }; }
@@ -170,7 +177,7 @@ AP.renderLog = () => {
   const table = body.closest('table'), wrap = table.closest('.tablewrap');
   table.classList.toggle('ap-on', AP.selMode);
   const hr = table.querySelector('thead tr');
-  if (hr && !hr.querySelector('.ap-c')) hr.insertAdjacentHTML('afterbegin', '<th class="ap-c"></th>');   if (hr && !hr.querySelector('.ap-items')) { const th = [...hr.children].find(x => /receipt/i.test(x.textContent)); if (th) th.insertAdjacentHTML('afterend', '<th class="ap-items">Items</th>'); }
+  if (hr) hr.innerHTML = '<th class="ap-c"></th><th>Receipt #</th><th>Time</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th>';
   if (!document.getElementById('apBar')) { const bar = document.createElement('div'); bar.id = 'apBar'; bar.className = 'searchbar'; wrap.parentNode.insertBefore(bar, wrap); }
   AP.bar();
   const list = filteredSalesLog().list.slice().reverse(); AP.shown = list;
@@ -179,8 +186,15 @@ AP.renderLog = () => {
     const act = (s.refunded ? '<span class="pill low">Refunded</span>' : `<button class="btn sm ghost" onclick="refundSale('${esc(s.id)}')">Refund</button>`)
       + ` <button class="btn sm ghost" onclick="AP.reprint('${esc(s.id)}')">🖨 Receipt</button>`
       + (pend ? ' <span class="pill low">Discount pending</span>' : rej ? ' <span class="pill low">Discount rejected</span>' : '');
-    return `<tr><td class="ap-c"><input type="checkbox" ${AP.sel.has(s.id) ? 'checked' : ''} ${s.refunded ? 'disabled' : ''} onchange="AP.pick('${esc(s.id)}',this.checked)"></td><td class="mono">${esc(s.id)}</td><td style="max-width:260px;white-space:normal;line-height:1.35">${esc(AP.itemsText(s)) || '<span style="color:var(--muted)">—</span>'}</td><td>${esc(saleDay(s))} ${esc(s.time)}</td><td>${esc(s.staff)}</td><td>${esc(s.payment)}</td><td class="mono">${naira(s.total)}</td><td>${act}</td></tr>`;
-  }).join('') || '<tr><td colspan="8" style="color:var(--muted);">No sales match.</td></tr>';
+    const L = (s.lines && s.lines.length) ? s.lines : [null], rs = L.length > 1 ? ` rowspan="${L.length}"` : '';
+    const lineCells = l => l
+      ? `<td style="max-width:240px;white-space:normal;line-height:1.35">${esc(AP.itemName(l))}</td><td style="text-align:right">${l.qty}</td><td class="mono" style="text-align:right">${naira(l.price)}</td>`
+      : '<td colspan="3" style="color:var(--muted)">—</td>';
+    return `<tr><td class="ap-c"${rs}><input type="checkbox" ${AP.sel.has(s.id) ? 'checked' : ''} ${s.refunded ? 'disabled' : ''} onchange="AP.pick('${esc(s.id)}',this.checked)"></td>`
+      + `<td class="mono"${rs}>${esc(s.id)}</td><td${rs}>${esc(saleDay(s))} ${esc(s.time)}</td>${lineCells(L[0])}`
+      + `<td class="mono"${rs} style="text-align:right">${naira(s.total)}</td><td${rs}>${esc(s.payment)}</td><td${rs}>${esc(s.staff)}</td><td${rs}>${act}</td></tr>`
+      + L.slice(1).map(l => `<tr>${lineCells(l)}</tr>`).join('');
+  }).join('') || '<tr><td colspan="10" style="color:var(--muted);">No sales match.</td></tr>';
 };
 { const _rsl = renderSalesLogFilter; renderSalesLogFilter = function () { _rsl(); AP.renderLog(); }; }   // the branch and category filters redraw the table through here
 { const _rr = renderReports; renderReports = function () { _rr(); AP.renderLog(); }; }
@@ -202,7 +216,8 @@ AP.sum = list => {
 AP.combined = () => {
   const list = AP.chosen(); if (!list) return;
   const t = AP.sum(list), pays = [...new Set(list.map(s => s.payment))], custs = [...new Set(list.map(s => s.customer).filter(Boolean))];
-  const comb = { id: `COMBINED-${list.length}`, combined: true, date: AP.dateLabel(list), time: AP.nowTime(), staff: `${currentUser.name} (${currentUser.id})`,
+  const idLabel = (ids => ids.slice(0, 3).join(', ') + (ids.length > 3 ? ` +${ids.length - 3} more` : ''))(list.map(s => s.id));
+  const comb = { id: idLabel, combined: true, date: AP.dateLabel(list), time: AP.nowTime(), staff: `${currentUser.name} (${currentUser.id})`,
     payment: pays.length === 1 ? pays[0] : 'Mixed', subtotal: t.gross - t.disc, vatAmount: t.vat, vatRate: list[0].vatRate || 0, total: t.total, customer: custs.join(', '),
     refunded: false, discount: t.disc ? { amount: t.disc, reason: '' } : null, lines: list.flatMap(s => s.lines) };
   const parts = list.map(s => `
@@ -210,9 +225,8 @@ AP.combined = () => {
     ${s.lines.map(l => `<div class="rline"><span class="nm">${esc(l.name)}</span><span>${naira(l.qty * l.price)}</span></div><div class="rline qp"><span>${l.qty} × ${naira(l.price)}</span><span></span></div>`).join('')}
     <div class="rmeta" style="opacity:.75"><span>Sale total${s.discountStatus === 'Pending' ? ' (discount pending)' : ''}</span><span>${naira(s.total)}</span></div><hr>`).join('');
   document.getElementById('receiptContent').innerHTML = `
-    <div class="stamp">COMBINED</div>${settings.logo ? `<div style="text-align:center;margin-bottom:6px;"><img src="${settings.logo}" style="max-height:44px;max-width:120px;object-fit:contain;"></div>` : ''}
+    ${settings.logo ? `<div style="text-align:center;margin-bottom:6px;"><img src="${settings.logo}" style="max-height:44px;max-width:120px;object-fit:contain;"></div>` : ''}
     <div class="rlogo">${esc(settings.name)}</div><div class="raddr">${esc(settings.address)}<br>${esc(settings.phone)}</div><hr>
-    <div class="rmeta"><span>Combined receipt</span><span>${list.length} sale${list.length > 1 ? 's' : ''}</span></div>
     <div class="rmeta"><span>Date</span><span>${esc(comb.date)}</span></div>
     <div class="rmeta"><span>Printed</span><span>${esc(AP.fmtDate(todayIso()))} ${esc(comb.time)}</span></div>
     ${comb.customer ? `<div class="rmeta"><span>Customer</span><span>${esc(comb.customer)}</span></div>` : ''}<hr>${parts}
@@ -251,3 +265,39 @@ AP.invoice = () => {
 
 /* ---------- 6. Type the quantity in the cart ---------- */ AP.setQty = (id, v) => {   const line = cart.find(c => c.id === id), item = items.find(i => i.id === id);   if (!line || !item) return;   const n = Math.floor(Number(v)), max = itemAvailable(item);   if (v === '' || isNaN(n)) return renderCart();   if (n <= 0 || max < 1) cart = cart.filter(c => c.id !== id);   else if (n > max) { line.qty = max; AP.toast(`Only ${max} in stock.`); }   else line.qty = n;   renderCart(); };  /* first look after sign-in */
 setTimeout(() => { if (currentUser) { AP.refresh(); AP.loadPending(); } }, 4000);
+
+/* ---------- 6. Approvals tab (admin only) ---------- */
+AP.after = () => { if (AP.viewActive()) AP.renderView(); else AP.pending.length ? AP.open() : ssClose(); };
+AP.renderView = () => {
+  const box = document.getElementById('apList'); if (!box || !AP.viewActive()) return;
+  box.innerHTML = AP.pending.length ? AP.pending.map(p => {
+    const when = `${AP.fmtDate(String(p.timestamp).slice(0, 10))} ${new Date(p.timestamp).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}`;
+    return `<div class="ap-req"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(p.saleId)}</b><small>${esc(when)} · ${esc(p.staffName)} (${esc(p.staffId)}) · ${esc(p.payment)}</small></div>
+      <div style="margin:8px 0;font-size:13px;line-height:1.5">${p.lines.map(l => `${esc(l.name)} × ${l.qty} <span style="color:var(--muted)">@ ${naira(l.price)}</span>`).join('<br>')}</div>
+      <div>Full price <b>${naira(p.subtotal)}</b><br>Discount asked <b>−${naira(p.requested)}</b>${p.reason ? ` <small>(${esc(p.reason)})</small>` : ''}<br>Customer pays <b>${naira(p.subtotal - p.requested)}</b> if approved</div>
+      <div class="row" style="margin-top:10px"><button class="btn sm gold" onclick="AP.decide('${esc(p.saleId)}',true,this)">Approve</button><button class="btn sm ghost" onclick="AP.decide('${esc(p.saleId)}',false,this)">Reject</button></div></div>`;
+  }).join('') : '<p class="helptext">No discounts are waiting. When a staff member asks for one at the till, it will appear here.</p>';
+};
+AP.refreshView = async () => {
+  if (!navigator.onLine) return AP.toast('You are offline. Connect to the internet to see new requests.');
+  await AP.loadPending(); AP.toast(AP.pending.length ? `${AP.pending.length} waiting.` : 'Nothing is waiting.');
+};
+(function () {
+  const st = document.createElement('style');
+  st.textContent = '.ap-badge{background:#b3261e;color:#fff;border-radius:99px;padding:1px 7px;font:700 11px sans-serif;margin-left:6px;vertical-align:middle}.ap-badge[hidden]{display:none}#bottomNav button{position:relative}#apBadgeDot{position:absolute;top:2px;right:14%;margin:0}';
+  document.head.append(st);
+  const tab = document.createElement('button'); tab.id = 'tabApprovals'; tab.dataset.view = 'approvals'; tab.hidden = true;
+  tab.innerHTML = 'Approvals <span class="ap-badge" id="apBadgeTab" hidden></span>';
+  document.getElementById('tabExpenses').insertAdjacentElement('afterend', tab);
+  const more = document.createElement('button'); more.className = 'sheetitem'; more.id = 'moreApprovals'; more.hidden = true; more.setAttribute('onclick', "fromMore('approvals')");
+  more.innerHTML = '<span class="ic">✅</span> <span>Approvals</span> <span class="ap-badge" id="apBadgeMore" hidden></span>';
+  document.getElementById('moreExpenses').insertAdjacentElement('afterend', more);
+  const view = document.createElement('div'); view.className = 'view'; view.id = 'view-approvals';
+  view.innerHTML = '<h2 class="viewtitle">Discount approvals</h2><p class="viewsub">Discounts staff asked for at the till. Each sale is already saved at full price. Approve to take the discount off, or reject to keep the full price.</p><div class="row" style="margin-bottom:12px"><button class="btn sm ghost" onclick="AP.refreshView()">↻ Refresh</button></div><div id="apList"></div>';
+  document.getElementById('view-expenses').insertAdjacentElement('afterend', view);
+  const moreBtn = document.querySelector('#bottomNav button[onclick="openMore()"]');
+  if (moreBtn) { const dot = document.createElement('span'); dot.id = 'apBadgeDot'; dot.className = 'ap-badge'; dot.hidden = true; moreBtn.append(dot); }
+})();
+{ const _sv = switchView; switchView = function (name) { _sv(name); if (name === 'approvals') AP.loadPending(); }; }
+{ const _ra = renderAll; renderAll = function () { _ra(); AP.renderView(); }; }
+{ const _arl = applyRoleLocks; applyRoleLocks = function () { _arl(); AP.badge(AP.pending.length, !!(currentUser && currentUser.role === 'admin')); }; }
