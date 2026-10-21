@@ -14,7 +14,8 @@ SY.chip=m=>{let c=document.getElementById('syChip');if(!c){c=document.createElem
  const n=syQ().length,f=ssGet('ss_failed',[]).length;c.textContent=m||(f?`${f} refused, tap to see`:!navigator.onLine?`Offline${n?', '+n+' waiting':''}`:n?`${n} waiting to sync`:'Synced');c.style.color=f?'#b3261e':'#333';c.classList.toggle('syncing',m==='Syncing...');c.hidden=!currentUser;};
 
 /* ---- 1. Work out what changed, after every save ---- */
-SY.sids=()=>{const d=syDev(),u=()=>Math.random().toString(36).slice(2,6);items.forEach(i=>{if(!i.sid)i.sid='I-'+d+'-'+i.id+'-'+u();});debtors.forEach(x=>{if(!x.sid)x.sid='C-'+d+'-'+syNum(x.id);});expenses.forEach(e=>{if(!e.sid)e.sid='E-'+d+'-'+syNum(e.id)+'-'+u();});};   // the random tail stops a new item or expense from reusing the ID of one that was deleted
+SY.sids=()=>{const d=syDev(),u=()=>Math.random().toString(36).slice(2,6);let made=false;items.forEach(i=>{if(!i.sid){i.sid='I-'+d+'-'+i.id+'-'+u();made=true;}});debtors.forEach(x=>{if(!x.sid){x.sid='C-'+d+'-'+syNum(x.id);made=true;}});expenses.forEach(e=>{if(!e.sid){e.sid='E-'+d+'-'+syNum(e.id)+'-'+u();made=true;}});
+ if(made){const m=SY.merging;SY.merging=true;try{persistItems();persistDebtors();persistExpenses();}finally{SY.merging=m;}}};   // the random tail stops a new item or expense from reusing the ID of one that was deleted
 SY.blob=()=>{const x=Object.assign({},settings);delete x.logo;delete x.logoHave;delete x.logoWant;return JSON.stringify({s:x,branches});};   // the logo travels separately, so the settings stay small
 const syLogo=()=>settings.logo&&settings.logo!==window.SS_LOGO?settings.logo.length+':'+settings.logo.slice(-20):'';
 const syPh=i=>i.photo?i.photo.length+':'+i.photo.slice(-20):'';
