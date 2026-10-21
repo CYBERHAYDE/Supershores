@@ -41,7 +41,8 @@ SY.diff=()=>{if(SY.merging||!currentUser||!syDev())return;SY.sids();const old=ss
    if(un>0)ops.push(['stock.in',{itemId:i.sid,qty:un,supplier:i.supplier||'',batch:i.trackBatches?newBatch(i,o):undefined}]);else if(un<0){ops.push(['stock.out',{itemId:i.sid,qty:-un,reason:'Adjustment',direction:'OUT',note:'Changed in the app',batch:i.trackBatches&&SY.adj[i.id]?{code:SY.adj[i.id]}:undefined}]);delete SY.adj[i.id];}}});
  newSales.forEach(s=>{const c=s.payment==='Credit'?debtors.find(d=>String(d.name).toLowerCase()===String(s.customer||'').toLowerCase().trim()):null,dc=s.discount;
   ops.push(['sale.create',{saleId:s.id,lines:s.lines.map(l=>({itemId:(lineItem(l)||{}).sid,qty:l.qty})),payment:s.payment,customerId:c?c.sid:undefined,voucher:dc&&dc.voucher||undefined,
-   discount:dc&&!dc.voucher&&currentUser.role==='admin'?{amount:dc.amount,reason:dc.reason||'Admin discount'}:undefined}]);});
+   discount:dc&&!dc.voucher&&currentUser.role==='admin'?{amount:dc.amount,reason:dc.reason||'Admin discount'}:undefined,
+   discountRequest:(s.discountStatus==='Pending'&&s.pendingDiscount)?{amount:s.pendingDiscount.amount,reason:s.pendingDiscount.reason||''}:undefined}]);});
  refunded.forEach(s=>ops.push(['sale.void',{saleId:s.id,reason:'Refunded in the app'}]));
  expenses.forEach(e=>{if(!(e.id in old.expenses))ops.push(['expense.add',{expenseId:e.sid,date:e.isoDate,category:e.category,amount:e.amount,notes:e.note||''}]);});
  Object.keys(old.expenses).forEach(id=>{if(!expenses.some(e=>String(e.id)===id))ops.push(['expense.reverse',{expenseId:old.expenses[id],reversalId:'R-'+old.expenses[id]+'-'+Date.now().toString(36),reason:'Deleted in the app'}]);});
