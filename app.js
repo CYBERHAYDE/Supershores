@@ -399,6 +399,7 @@ function renderDashboard(){
   const todaysTotal = today.reduce((s,x)=>s+x.total,0);
   const lowStock = items.filter(i=>!i.service&&!i.bundle&&i.stock<=i.reorder);
   const stockValue = items.reduce((s,i)=>s+(i.service?0:(i.cost||0)*i.stock),0);
+  const stockValueSell = items.reduce((s,i)=>s+(i.service?0:(+i.price||0)*i.stock),0);
   const qtyByItem = {};
   today.forEach(s=>s.lines.forEach(l=>{ qtyByItem[l.name]=(qtyByItem[l.name]||0)+l.qty; }));
   const topSeller = Object.entries(qtyByItem).sort((a,b)=>b[1]-a[1])[0];
@@ -407,7 +408,8 @@ function renderDashboard(){
     <div class="card" style="cursor:pointer;" onclick="scrollToLowStock()"><div class="k">${t('cardLowStockAlerts')}</div><div class="v ${lowStock.length?'alert':'good'}">${lowStock.length}</div><div class="foot">${t('cardLowStockFoot')}</div></div>
     <div class="card"><div class="k">${t('cardTopSeller')}</div><div class="v" style="font-size:15px;">${topSeller?esc(topSeller[0]):'—'}</div><div class="foot">${topSeller?t('cardSoldFoot',{n:topSeller[1]}):''}</div></div>`;
   cards += role()==='admin'
-    ? `<div class="card"><div class="k">${t('cardStockValueCost')}</div><div class="v">${naira(stockValue)}</div><div class="foot">${t('cardAdminOnlyFoot')}</div></div>`
+    ? `<div class="card"><div class="k">${t('cardStockValueCost')}</div><div class="v">${naira(stockValue)}</div><div class="foot">${t('cardAdminOnlyFoot')}</div></div>
+       <div class="card"><div class="k">${t('cardStockValueSell')}</div><div class="v">${naira(stockValueSell)}</div><div class="foot">${t('cardStockValueSellFoot')}</div></div>`
     : `<div class="card"><div class="k">${t('cardStockValue')}</div><div class="v" style="font-size:13px; color:var(--muted);">${t('cardAdminOnly')}</div><div class="foot">${t('cardNotVisibleStaff')}</div></div>`;
   document.getElementById('dashCards').innerHTML = cards;
   document.getElementById('lowStockBody').innerHTML = lowStock.map(i=>`
