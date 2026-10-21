@@ -4,7 +4,7 @@ const SS={API:'https://script.google.com/macros/s/AKfycbyR4tyWCQ7OVLSfhe3UUr2vsZ
 SS.api=async(action,body={})=>{const r=await fetch(SS.API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...body})});
  const j=await r.json();if(!j.ok){const e=new Error(j.error);e.code=j.code;throw e;}return j.data;};
 /* Loading feedback: a thin bar at the top while something the person tapped is waiting on the server */
-{const FG=['login','firstRun','staff.list','staff.add','staff.resetPasscode','staff.setActive','staff.update','staff.delete','staff.setPerms','changePasscode','authorizeDiscount','payment.submit','data.reset','registerDevice'],raw=SS.api;let pend=0,tm;
+{const FG=['login','firstRun','staff.list','staff.add','staff.resetPasscode','staff.setActive','staff.update','staff.delete','staff.setPerms','changePasscode','authorizeDiscount','payment.submit','discount.decide','data.reset','registerDevice'],raw=SS.api;let pend=0,tm;
  SS.api=async(action,body)=>{const fg=FG.includes(action),bar=document.getElementById('ssTopBar');if(fg){pend++;clearTimeout(tm);tm=setTimeout(()=>{if(pend&&bar)bar.classList.add('on');},200);}
   try{return await raw(action,body);}finally{if(fg){pend--;if(!pend){clearTimeout(tm);if(bar)bar.classList.remove('on');}}}};}
 const ssGet=(k,d)=>{try{const v=JSON.parse(SSLS.getItem(k));return v===null?d:v;}catch(e){return d;}},ssSet=(k,v)=>SSLS.setItem(k,JSON.stringify(v));
@@ -162,9 +162,9 @@ function ssClean(html){const d=new DOMParser().parseFromString(String(html),'tex
  return Array.from(d.head.querySelectorAll('style')).map(s=>s.outerHTML).join('')+d.body.innerHTML;}
 function ssRender(tpl,sale){const n=naira,e=esc,rows=sale.lines.map(l=>`<tr><td>${e(l.name)}</td><td style="text-align:right;white-space:nowrap">${l.qty} × ${n(l.price)}</td><td style="text-align:right">${n(l.qty*l.price)}</td></tr>`).join('');
  const dsc=sale.discount?+sale.discount.amount:0,M={business_name:e(settings.name),address:e(settings.address||''),phone:e(settings.phone||''),logo_src:settings.logo||'',
-  logo:settings.logo?`<img src="${settings.logo}" style="max-height:60px;max-width:160px" alt="">`:'',receipt_no:e(sale.id),date:e(sale.isoDate||sale.date||''),time:e(sale.time||''),cashier:e(sale.staff||''),customer:e(sale.customer||''),
+  logo:settings.logo?`<img src="${settings.logo}" style="max-height:60px;max-width:160px" alt="">`:'',receipt_no:e(sale.id),date:e(receiptDate(sale)),time:e(sale.time||''),cashier:e(sale.staff||''),customer:e(sale.customer||''),
   items:`<table style="width:100%;border-collapse:collapse">${rows}</table>`,subtotal:n((+sale.subtotal||0)+dsc),discount:dsc?n(dsc):'',vat:sale.vatAmount?n(sale.vatAmount):'',total:n(sale.total),
-  payment_method:e(sale.payment),status:sale.refunded?'REFUNDED':sale.payment==='Credit'?'ON CREDIT':'PAID',footer:e(settings.footer||'')};
+  payment_method:e(sale.payment),status:sale.refunded?'REFUNDED':sale.discountStatus==='Pending'?'DISCOUNT PENDING':sale.payment==='Credit'?'ON CREDIT':'PAID',footer:e(settings.footer||'')};
  return tpl.replace(/\{\{\s*([a-z_]+)\s*\}\}/g,(m,k)=>k in M?M[k]:'');}
 const ssShowReceipt=showReceipt;
 showReceipt=function(sale){if(!settings.receiptTpl)return ssShowReceipt(sale);try{document.getElementById('receiptContent').innerHTML=ssRender(settings.receiptTpl,sale);document.getElementById('receiptOverlay').classList.add('active');}catch(e){ssShowReceipt(sale);}};
