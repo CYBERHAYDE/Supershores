@@ -146,7 +146,7 @@ if('serviceWorker'in navigator){let had=!!navigator.serviceWorker.controller;
 
 /* ---------- Start ---------- */
 const ssLogout=logout;logout=function(){SS.token=null;ssLogout();};
-if(currentUser){SS.token=currentUser.token;SS.afterEnter();}else renderAuthGate('login');
+if(currentUser){SS.token=currentUser.token;setTimeout(()=>SS.afterEnter(),0);}else renderAuthGate('login');
 
 /* ---------- The app keeps checking the subscription while it is open ---------- */
 setInterval(()=>{if(currentUser&&!document.getElementById('ssOv'))SS.gate();},60000);
