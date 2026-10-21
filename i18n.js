@@ -32,7 +32,7 @@ pitchFooter:"Powerful inventory management, built for the way your business work
     lowStockPill:'Low stock', inStockPill:'In stock', expiredPill:'Expired', expiresInDays:'Expires in {d}d', currentlyInStock:'Currently {n} {unit} in stock',
     manageStaff:'Manage staff', resetPasswordBtn:'Reset password', pendingCost:'Pending', reorderSoonPill:'Reorder soon', comfortablePill:'Comfortable',
     cardTodaysSales:"Today's Sales", cardTransactionsFoot:'{n} transactions', cardLowStockAlerts:'Low Stock Alerts', cardLowStockFoot:'items at or below reorder point',
-    cardTopSeller:'Top Seller Today', cardSoldFoot:'{n} sold', cardStockValueCost:'Stock Value (Cost)', cardAdminOnlyFoot:'admin-only figure', cardStockValue:'Stock Value',
+    cardTopSeller:'Top Seller Today', cardSoldFoot:'{n} sold', cardStockValueCost:'Stock Value (Cost)', cardStockValueSell:'Stock Value (Selling Price)', cardStockValueSellFoot:'if everything sells at full price', cardAdminOnlyFoot:'admin-only figure', cardStockValue:'Stock Value',
     cardAdminOnly:'Admin only', cardNotVisibleStaff:'not visible to staff', cardRevenueToday:'Revenue Today', cardGrossProfitToday:'Gross Profit Today',
     cardTransactionsToday:'Transactions Today', cardTotalSalesToday:'Total Sales Today', cardCashSalesToday:'Cash Sales Today', cardLowStockItems:'Low Stock Items',
     deactivateBtn:'Deactivate', reactivateBtn:'Reactivate', activeStatus:'Active', inactiveStatus:'Deactivated', colId:'ID', colName:'Name', colRole:'Role', colAccountStatus:'Status',
@@ -95,7 +95,7 @@ pitchFooter:"Powerful inventory management, built for the way your business work
     lowStockPill:'Dey finish', inStockPill:'E dey', expiredPill:'E don expire', expiresInDays:'E go expire for {d} days', currentlyInStock:'{n} {unit} dey now',
     manageStaff:'Manage staff', resetPasswordBtn:'Reset password', pendingCost:'Dem never add am', reorderSoonPill:'Order am soon', comfortablePill:'E still dey OK',
     cardTodaysSales:'Wetin Sell Today', cardTransactionsFoot:'{n} sale wey happen', cardLowStockAlerts:'Stock Wey Dey Finish', cardLowStockFoot:'items wey don reach order level',
-    cardTopSeller:'Wetin Sell Well Today', cardSoldFoot:'{n} sell', cardStockValueCost:'Stock Value (Cost)', cardAdminOnlyFoot:'Admin only number', cardStockValue:'Stock Value',
+    cardTopSeller:'Wetin Sell Well Today', cardSoldFoot:'{n} sell', cardStockValueCost:'Stock Value (Cost)', cardStockValueSell:'Stock Value (Selling Price)', cardStockValueSellFoot:'if all of am sell for full price', cardAdminOnlyFoot:'Admin only number', cardStockValue:'Stock Value',
     cardAdminOnly:'Admin only', cardNotVisibleStaff:'Staff no fit see am', cardRevenueToday:'Money Wey Enter Today', cardGrossProfitToday:'Profit Today',
     cardTransactionsToday:'How Many Sale Today', cardTotalSalesToday:'Total Sales Today', cardCashSalesToday:'Cash Sales Today', cardLowStockItems:'Items Wey Dey Finish',
     deactivateBtn:'Stop Am', reactivateBtn:'Bring Am Back', activeStatus:'E Dey Active', inactiveStatus:'Dem Don Stop Am', colId:'ID', colName:'Name', colRole:'Role', colAccountStatus:'Status',
@@ -284,7 +284,7 @@ pitchFooter:"Powerful inventory management, built for the way your business work
     lowStockPill:'Stock faible', inStockPill:'En stock', expiredPill:'Périmé', expiresInDays:'Expire dans {d} j', currentlyInStock:'{n} {unit} actuellement en stock',
     manageStaff:'Gérer le personnel', resetPasswordBtn:'Réinitialiser le mot de passe', pendingCost:'En attente', reorderSoonPill:'À réapprovisionner', comfortablePill:'Confortable',
     cardTodaysSales:"Ventes du jour", cardTransactionsFoot:'{n} transactions', cardLowStockAlerts:'Alertes stock faible', cardLowStockFoot:'articles au seuil de réapprovisionnement ou en dessous',
-    cardTopSeller:'Meilleure vente du jour', cardSoldFoot:'{n} vendus', cardStockValueCost:'Valeur du stock (coût)', cardAdminOnlyFoot:"chiffre réservé à l'Admin", cardStockValue:'Valeur du stock',
+    cardTopSeller:'Meilleure vente du jour', cardSoldFoot:'{n} vendus', cardStockValueCost:'Valeur du stock (coût)', cardStockValueSell:'Valeur du stock (prix de vente)', cardStockValueSellFoot:'si tout se vend au prix plein', cardAdminOnlyFoot:"chiffre réservé à l'Admin", cardStockValue:'Valeur du stock',
     cardAdminOnly:"Réservé à l'Admin", cardNotVisibleStaff:'non visible par le personnel', cardRevenueToday:'Revenu du jour', cardGrossProfitToday:'Profit brut du jour',
     cardTransactionsToday:'Transactions du jour', cardTotalSalesToday:'Ventes totales du jour', cardCashSalesToday:'Ventes en espèces du jour', cardLowStockItems:'Articles en stock faible',
     deactivateBtn:'Désactiver', reactivateBtn:'Réactiver', activeStatus:'Actif', inactiveStatus:'Désactivé', colId:'ID', colName:'Nom', colRole:'Rôle', colAccountStatus:'Statut du compte',
@@ -330,4 +330,3 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.innerHTML = t(el.getAttribute('data-i18n')); });
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.placeholder = t(el.getAttribute('data-i18n-ph')); });
 }
-
