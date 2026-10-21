@@ -904,7 +904,7 @@ function renderCart(){
   const list = document.getElementById('cartList');
   list.innerHTML = cart.length===0 ? `<p class="helptext">${t('noItemsYet')}</p>` :
     cart.map(c=>`<div class="cart-row"><div>${esc(c.name)}<br><span class="stock">${naira(c.price)} each</span></div>
-      <div class="qty"><button onclick="changeQty(${c.id},-1)">–</button><span>${c.qty}</span><button onclick="changeQty(${c.id},1)">+</button></div></div>`).join('');
+      <div class="qty"><button onclick="changeQty(${c.id},-1)">–</button><input type="number" min="0" inputmode="numeric" value="${c.qty}" style="width:56px;text-align:center" onfocus="this.select()" onchange="AP.setQty(${c.id},this.value)"><button onclick="changeQty(${c.id},1)">+</button></div></div>`).join('');
   const rawSubtotal = cart.reduce((s,c)=>s+c.price*c.qty,0);
   const discountAmount = appliedDiscount ? Math.min(appliedDiscount.amount, rawSubtotal) : 0;
   document.getElementById('cartTotal').textContent = naira(rawSubtotal - discountAmount);
