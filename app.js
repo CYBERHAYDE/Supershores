@@ -1008,14 +1008,14 @@ function completeSale(){
 }
 
 /* ================= Receipt ================= */
-function showReceipt(sale){
-  const stampHtml = sale.refunded ? `<div class="stamp credit">REFUNDED</div>` : sale.payment==='Credit' ? `<div class="stamp credit">ON CREDIT</div>` : `<div class="stamp">PAID</div>`;
+function receiptDate(s){ const iso = s && s.isoDate; if(!iso) return (s && s.date) || ''; const d = new Date(iso+'T12:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); } function showReceipt(sale){
+  const pend = sale.discountStatus==='Pending';   const stampHtml = pend ? `<div class="stamp credit">DISCOUNT PENDING</div>` : sale.refunded ? `<div class="stamp credit">REFUNDED</div>` : sale.payment==='Credit' ? `<div class="stamp credit">ON CREDIT</div>` : `<div class="stamp">PAID</div>`;
   const lines = sale.lines.map(l=>`<div class="rline"><span class="nm">${esc(l.name)}</span><span>${naira(l.qty*l.price)}</span></div><div class="rline qp"><span>${l.qty} × ${naira(l.price)}</span><span></span></div>`).join('');
   const vatRow = sale.vatAmount ? `<div class="rmeta"><span>Subtotal</span><span>${naira(sale.subtotal)}</span></div><div class="rmeta"><span>VAT (${sale.vatRate}%)</span><span>${naira(sale.vatAmount)}</span></div>` : '';
-  const discountRow = sale.discount ? `<div class="rmeta" style="color:var(--sage);"><span>Discount${sale.discount.reason?` (${esc(sale.discount.reason)})`:''}</span><span>−${naira(sale.discount.amount)}</span></div>` : '';
+  const discountRow = pend && sale.pendingDiscount ? `<div class="rmeta" style="font-style:italic;"><span>Discount requested${sale.pendingDiscount.reason?` (${esc(sale.pendingDiscount.reason)})`:''}</span><span>${naira(sale.pendingDiscount.amount)}</span></div><div class="rmeta" style="font-size:11px;"><span>Waiting for admin approval. Amount above is the full price.</span><span></span></div>` : sale.discount ? `<div class="rmeta" style="color:var(--sage);"><span>Discount${sale.discount.reason?` (${esc(sale.discount.reason)})`:''}</span><span>−${naira(sale.discount.amount)}</span></div>` : '';
   document.getElementById('receiptContent').innerHTML = `
     ${stampHtml}${settings.logo?`<div style="text-align:center; margin-bottom:6px;"><img src="${settings.logo}" style="max-height:44px; max-width:120px; object-fit:contain;"></div>`:''}<div class="rlogo">${esc(settings.name)}</div><div class="raddr">${esc(settings.address)}<br>${esc(settings.phone)}</div><hr>
-    <div class="rmeta"><span>Receipt #${esc(sale.id)}</span><span>${esc(sale.time)}</span></div>
+    <div class="rmeta"><span>Receipt #${esc(sale.id)}</span><span>${esc(sale.time)}</span></div>     <div class="rmeta"><span>Date</span><span>${esc(receiptDate(sale))}</span></div>
     <div class="rmeta"><span>Served by</span><span>${esc(sale.staff)}</span></div>
     ${sale.customer ? `<div class="rmeta"><span>Customer</span><span>${esc(sale.customer)}</span></div>` : ''}
     <hr>${lines}<hr>
@@ -1047,7 +1047,8 @@ function buildEscPos(sale){
   text(`${settings.address}\n${settings.phone}\n`);
   push(0x1B,0x61,0x00); // left align
   text('--------------------------------\n');
-  text(`Receipt #${sale.id}   ${sale.time}\n`);
+  text(`Receipt #${sale.id}\n`); text(`Date: ${receiptDate(sale)}  ${sale.time}\n`);
+  if(sale.discountStatus==='Pending') text(`** DISCOUNT PENDING APPROVAL **\n`);
   text(`Served by: ${sale.staff}\n`);
   if(sale.customer) text(`Customer: ${sale.customer}\n`);
   text('--------------------------------\n');
@@ -1090,7 +1091,7 @@ async function printEscPosBluetooth(){
 if('bluetooth' in navigator){ const b=document.getElementById('btPrintBtn'); if(b) b.style.display='inline-block'; }
 function shareReceiptWa(){
   if(!lastSale) return;
-  let text = `Receipt ${lastSale.id} — ${settings.name}%0A`;
+  let text = `Receipt ${lastSale.id} — ${settings.name}%0ADate: ${receiptDate(lastSale)} ${lastSale.time}%0A`;
   lastSale.lines.forEach(l=>{ text += `${l.name} x${l.qty} — ${naira(l.qty*l.price)}%0A`; });
   text += `TOTAL: ${naira(lastSale.total)}%0APayment: ${lastSale.payment}%0A${settings.footer}`;
   window.open(`https://wa.me/?text=${text}`,'_blank');
