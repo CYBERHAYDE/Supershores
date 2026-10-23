@@ -45,12 +45,6 @@ function persistExpenses(){ SSLS.setItem('ch_expenses', JSON.stringify(expenses)
 
 /* ================= Users / auth ================= */
 let users = JSON.parse(SSLS.getItem('ch_users') || '[]');
-/* Tidy saved data once at start: a record with a missing list or a non-number must never be able to break a screen */
-(function tidySavedData(){
-  sales.forEach(s=>{ if(!Array.isArray(s.lines)) s.lines = []; });
-  debtors.forEach(d=>{ if(!Array.isArray(d.history)) d.history = []; d.balance = +d.balance || 0; });
-  expenses.forEach(e=>{ e.amount = +e.amount || 0; e.isoDate = normDate(e.isoDate) || e.isoDate; });
-})();
 let activityLog = JSON.parse(SSLS.getItem('ch_log') || '[]');
 let currentUser = JSON.parse(sessionStorage.getItem('ch_current') || 'null');
 let cart = [];
@@ -445,6 +439,17 @@ function populateCategoryFilters(){
   if(newSel.options.length===0) CATEGORIES.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; newSel.appendChild(o); });
   populateBranchSelects();
 }
+function populateBranchSelects(){
+  const filterSel = document.getElementById('invBranch');
+  const formSel = document.getElementById('newBranch');
+  [filterSel, formSel].forEach(sel=>{
+    if(!sel) return;
+    const keep = sel===filterSel ? '' : null; // filter keeps its "All branches" first option
+    const startAt = sel===filterSel ? 1 : 0;
+    while(sel.options.length>startAt) sel.remove(startAt);
+    branches.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; sel.appendChild(o); });
+  });
+}
 function renderBranchList(){
   const wrap = document.getElementById('branchList');
   if(!wrap) return;
@@ -568,6 +573,48 @@ function submitRestock(id){
   persistItems();
   logActivity(`Restocked "${item.name}" — +${qty} ${item.unit}${details.length ? ' ('+details.join(', ')+')' : ''}`);
   restockingItemId = null;
+  renderAll();
+}
+function renderEditRow(i, isAdmin){
+  const costInput = isAdmin
+    ? `<td><input type="number" class="mono editcell" id="editCost" value="${i.cost==null?'':i.cost}" placeholder="—"></td>`
+    : '';
+  const marginTd = isAdmin ? `<td class="mono" style="color:var(--muted);">—</td>` : '';
+  return `<tr class="editor-row" style="background:#FBF8ED;">
+    <td>${photoCell(i)}</td>
+    <td><b>${esc(i.name)}</b></td>
+    <td>${esc(i.category)}</td>
+<td>${i.service ? '<span class="mono">—</span><input type="hidden" id="editStock" value="0">' : `<input type="number" class="mono editcell editcell-sm" id="editStock" value="${i.stock}"> ${esc(i.unit)}`}</td>
+    ${costInput}
+    <td><input type="number" class="mono editcell" id="editPrice" value="${i.price}"></td>
+    ${marginTd}
+    <td colspan="2" class="editrow-actions">
+      <button class="btn sm gold" onclick="saveEditItem(${i.id})">${t('save')}</button>
+      <button class="btn sm ghost" onclick="cancelEditItem()">${t('cancel')}</button>
+    </td>
+  </tr>`;
+}
+function saveEditItem(id){
+  const item = items.find(x=>x.id===id);
+  const newPrice = Number(document.getElementById('editPrice').value);
+  const newStock = Number(document.getElementById('editStock').value);
+  if(!newPrice || newPrice<=0){ alert('Selling price must be greater than zero.'); return; }
+  if(newStock<0){ alert('Stock cannot be negative.'); return; }
+  const changes = [];
+  if(newPrice!==item.price) changes.push(`price ${naira(item.price)} → ${naira(newPrice)}`);
+  if(newStock!==item.stock) changes.push(`stock ${item.stock} → ${newStock}`);
+  item.price = newPrice; item.stock = newStock;
+  if(role()==='admin'){
+    const costEl = document.getElementById('editCost');
+    if(costEl){
+      const newCost = costEl.value==='' ? null : Number(costEl.value);
+      if(newCost!==item.cost) changes.push(`cost ${item.cost==null?'—':naira(item.cost)} → ${newCost==null?'—':naira(newCost)}`);
+      item.cost = newCost;
+    }
+  }
+  persistItems();
+  if(changes.length) logActivity(`Edited "${item.name}" — ${changes.join(', ')}`);
+  editingItemId = null;
   renderAll();
 }
 function toggleAddBox(){ if(!can('items')){ alert('You do not have access to add products. Ask the admin.'); return; } const box=document.getElementById('addBox'); box.classList.toggle('open'); if(box.classList.contains('open')) applyRoleLocks(); }
@@ -776,6 +823,12 @@ function viewBatches(id){
   alert(`Batches for ${item.name}:\n\n${lines.join('\n')}`);
 }
 
+function toggleServiceMode(){
+  const on = document.getElementById('newIsService').checked;
+  ['newStock','newReorder'].forEach(id=>{ const el=document.getElementById(id); el.disabled=on; if(on) el.value=''; el.closest('div').style.opacity = on?.4:1; });
+  if(on){ document.getElementById('newIsBundle').checked=false; document.getElementById('bundleBuilder').style.display='none'; document.getElementById('newTrackBatches').checked=false; }
+  document.getElementById('newIsBundle').disabled=on; document.getElementById('newTrackBatches').disabled=on;
+}
 function submitNewItem(){
   const name = document.getElementById('newName').value.trim();
   const category = document.getElementById('newCategory').value;
@@ -917,16 +970,9 @@ function completeSale(){
   // Re-check stock at the moment of completion, not just when items were added to
   // the cart — protects against two staff selling the last unit of something from
   // two different sessions on the same device in quick succession.
-  const need = {};   // units of each real item the whole cart will take, counting items inside bundles
   for(const c of cart){
     const item = items.find(i=>i.id===c.id);
     if(!item || c.qty>itemAvailable(item)){ alert(`Not enough stock of "${item?item.name:'an item'}" left to complete this sale. Please adjust the cart.`); renderSaleSearch(); renderCart(); return; }
-    if(item.service) continue;
-    (item.bundle ? item.bundle.map(k=>[k.itemId, k.qty*c.qty]) : [[item.id, c.qty]]).forEach(([id,n])=>{ need[id] = (need[id]||0) + n; });
-  }
-  for(const id of Object.keys(need)){
-    const it = items.find(i=>i.id===+id);
-    if(it && need[id] > it.stock){ alert(`Not enough stock of "${it.name}" for everything in this cart: ${it.stock} left, ${need[id]} needed (items inside bundles count too). Please adjust the cart.`); renderSaleSearch(); renderCart(); return; }
   }
   const rawSubtotal = cart.reduce((s,c)=>s+c.price*c.qty,0);
   const discountAmount = appliedDiscount ? Math.min(appliedDiscount.amount, rawSubtotal) : 0;
@@ -1047,16 +1093,16 @@ async function printEscPosBluetooth(){
 if('bluetooth' in navigator){ const b=document.getElementById('btPrintBtn'); if(b) b.style.display='inline-block'; }
 function shareReceiptWa(){
   if(!lastSale) return;
-  const rows = [`Receipt ${lastSale.id} — ${settings.name}`, `Date: ${receiptDate(lastSale)} ${lastSale.time}`];
-  lastSale.lines.forEach(l=>{ rows.push(`${l.name} x${l.qty} — ${naira(l.qty*l.price)}`); });
-  rows.push(`TOTAL: ${naira(lastSale.total)}`, `Payment: ${lastSale.payment}`, `${settings.footer}`);
-  window.open(`https://wa.me/?text=${encodeURIComponent(rows.join('\n'))}`,'_blank');
+  let text = `Receipt ${lastSale.id} — ${settings.name}%0ADate: ${receiptDate(lastSale)} ${lastSale.time}%0A`;
+  lastSale.lines.forEach(l=>{ text += `${l.name} x${l.qty} — ${naira(l.qty*l.price)}%0A`; });
+  text += `TOTAL: ${naira(lastSale.total)}%0APayment: ${lastSale.payment}%0A${settings.footer}`;
+  window.open(`https://wa.me/?text=${text}`,'_blank');
 }
 function shareLowStockWa(){
   const lowStock = items.filter(i=>!i.service&&!i.bundle&&i.stock<=i.reorder);
-  const rows = [`Low stock alert — ${settings.name}`];
-  lowStock.forEach(i=>{ rows.push(`${i.name}: ${i.stock} ${i.unit} left (reorder at ${i.reorder})`); });
-  window.open(`https://wa.me/${settings.wa||''}?text=${encodeURIComponent(rows.join('\n'))}`,'_blank');
+  let text = `Low stock alert — ${settings.name}%0A`;
+  lowStock.forEach(i=>{ text += `${i.name}: ${i.stock} ${i.unit} left (reorder at ${i.reorder})%0A`; });
+  window.open(`https://wa.me/${settings.wa||''}?text=${text}`,'_blank');
 }
 
 /* ================= Barcode scan ================= */
@@ -1149,8 +1195,6 @@ function getSelectedRange(){
   let from, to = iso(today);
   if(preset==='today'){ from = iso(today); }
   else if(preset==='yesterday'){ const y=new Date(today); y.setDate(y.getDate()-1); from=iso(y); to=iso(y); }
-  else if(preset==='thisweek'){ const w=new Date(today); w.setDate(w.getDate()-((w.getDay()+6)%7)); from=iso(w); }   // Monday to today
-  else if(preset==='thismonth'){ from=iso(new Date(today.getFullYear(), today.getMonth(), 1)); }   // the 1st to today
   else if(preset==='week'){ const w=new Date(today); w.setDate(w.getDate()-6); from=iso(w); }
   else if(preset==='month'){ const m=new Date(today); m.setDate(m.getDate()-29); from=iso(m); }
   else if(preset==='all'){ from='2000-01-01'; }
@@ -1158,7 +1202,6 @@ function getSelectedRange(){
     from = document.getElementById('rangeFrom').value || iso(today);
     to = document.getElementById('rangeTo').value || iso(today);
   }
-  if(from>to){ const t0=from; from=to; to=t0; }   // dates picked the wrong way round still work
   return { from, to, preset };
 }
 function inRange(sale, range){ return sale.isoDate>=range.from && sale.isoDate<=range.to; }
@@ -1235,13 +1278,11 @@ function renderReports(){
    (full return workflow with partial-line returns is a good next step, but this
    covers the common "whole sale returned" case at zero extra infrastructure cost). */
 function refundSale(id){
-  if(role()!=='admin'){ alert('Only an admin can refund a sale.'); return; }
   const sale = sales.find(s=>s.id===id);
   if(!sale || sale.refunded) return;
   if(!confirm(`Refund ${sale.id} (${naira(sale.total)}) and return these items to stock?`)) return;
   sale.lines.forEach(l=>{ const item = (l.itemId!=null && items.find(i=>i.id===l.itemId)) || items.find(i=>i.name===l.name); if(!item || item.service) return; if(item.bundle){ item.bundle.forEach(c=>{ const ci=items.find(i=>i.id===c.itemId); if(ci) ci.stock += c.qty*l.qty; }); } else item.stock += l.qty; });
   sale.refunded = true;
-  if(sale.payment==='Credit' && sale.customer){ const cd = debtors.find(x=>String(x.name).toLowerCase()===String(sale.customer).toLowerCase().trim()); if(cd){ cd.balance = Math.max(0, cd.balance - sale.total); persistDebtors(); } }
   persistItems(); persistSales();
   logActivity(`Refunded sale ${sale.id} (${naira(sale.total)}) — items returned to stock`);
   renderAll();
@@ -1306,11 +1347,10 @@ function renderExpenses(){
   if(!can('expenses')) return;
   document.getElementById('expensesBody').innerHTML = expenses.slice().reverse().map(e=>`
     <tr><td>${esc(e.isoDate)}</td><td>${esc(e.category)}</td><td class="mono">${naira(e.amount)}</td><td>${esc(e.loggedBy)}</td><td>${esc(e.note||'—')}</td>
-    <td>${role()==='admin' ? `<button class="btn sm ghost" onclick="deleteExpense('${e.id}')">Delete</button>` : ''}</td></tr>`).join('')
+    <td><button class="btn sm ghost" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')
     || `<tr><td colspan="6" style="color:var(--muted);">${t('noExpensesYet')}</td></tr>`;
 }
 function deleteExpense(id){
-  if(role()!=='admin'){ alert('Only an admin can delete an expense.'); return; }
   const exp = expenses.find(e=>e.id===id); if(!exp) return;
   if(!confirm(`Delete this expense (${exp.category}, ${naira(exp.amount)})?`)) return;
   expenses = expenses.filter(e=>e.id!==id);
@@ -1331,11 +1371,11 @@ function renderCloseDay(){
   const lowStock = items.filter(i=>!i.service&&!i.bundle&&i.stock<=i.reorder).length;
   document.getElementById('closeCards').innerHTML = `
     <div class="card"><div class="k">${t('cardTotalSalesToday')}</div><div class="v">${naira(total)}</div></div>
-    <div class="card"><div class="k">${t('cardCashSalesToday')}</div><div class="v good">${naira(cashTotal)}</div></div>     <div class="card"><div class="k">Expenses Today</div><div class="v alert">${naira(cashOutToday())}</div></div>
+    <div class="card"><div class="k">${t('cardCashSalesToday')}</div><div class="v good">${naira(cashTotal)}</div></div>
     <div class="card"><div class="k">${t('cardLowStockItems')}</div><div class="v ${lowStock?'alert':'good'}">${lowStock}</div></div>`;
   const cashOut = cashOutToday(), expectedCash = cashTotal - cashOut;
   document.getElementById('expectedCashNote').textContent = cashOut>0 ? `Expected cash in till: ${naira(cashTotal)} cash sales minus ${naira(cashOut)} expenses paid today = ${naira(expectedCash)}` : `Expected cash in till from today's Cash sales: ${naira(cashTotal)}`;
-  let expList = document.getElementById('closeExpList');   if(!expList){ expList = document.createElement('div'); expList.id = 'closeExpList'; expList.style.cssText = 'margin:8px 0;font-size:13px;'; document.getElementById('expectedCashNote').insertAdjacentElement('afterend', expList); }   const todayExp = expenses.filter(e=>e.isoDate===todayIso());   expList.innerHTML = todayExp.length ? '<b>Expenses paid today</b><br>' + todayExp.map(e=>`• ${esc(e.category)}${e.note?' — '+esc(e.note):''}: ${naira(e.amount)} <small style="color:var(--muted)">(${esc(e.loggedBy)})</small>`).join('<br>') : '';   window._expectedCash = expectedCash;
+  window._expectedCash = expectedCash;
   updateCashDiff();
 }
 function updateCashDiff(){
@@ -1388,7 +1428,7 @@ function printCloseDay(){
     [
       ['Total sales today', naira(total)],
       ['Cash sales today', naira(cashTotal)],
-      ['Expenses paid today', naira(cashOutToday())],       ...expenses.filter(e=>e.isoDate===todayIso()).map(e=>['– '+esc(e.category)+(e.note?' — '+esc(e.note):''), naira(e.amount)]),
+      ['Expenses paid today', naira(cashOutToday())],
       ['Expected cash in till', naira(cashTotal-cashOutToday())],
       ['Cash counted in till', counted ? naira(counted) : '—'],
       ['Difference vs expected', counted ? naira(counted-(cashTotal-cashOutToday())) : '—'],
@@ -1410,6 +1450,11 @@ function printTopSellers(){
   const range = getSelectedRange();
   showPrintableReport('Top Sellers', `${range.from} → ${range.to}`, ['Item','Qty sold','Revenue'], rows);
 }
+function printSalesLog(){
+  const range = getSelectedRange();
+  const rows = sales.filter(s=>inRange(s,range)).slice().reverse().map(s=>[s.id, `${saleDay(s)} ${s.time}`, esc(s.staff), s.payment, naira(s.total)]);
+  showPrintableReport('Sales Log', `${range.from} → ${range.to}`, ['Receipt #','Time','Staff','Payment','Total'], rows);
+}
 function printLowStock(){
   const low = items.filter(i=>!i.service&&!i.bundle&&i.stock<=i.reorder);
   showPrintableReport('Low Stock List', `${low.length} items at or below reorder point`,
@@ -1421,9 +1466,7 @@ function scrollToLowStock(){ document.getElementById('lowStockPanel').scrollInto
 
 /* ================= CSV export ================= */
 function downloadCSV(filename, rows){
-  // text that starts with = + - @ would run as a formula when opened in Excel, so it gets a leading apostrophe; the BOM keeps accents and Yoruba letters readable
-  const cell = v => { let s = String(v==null ? '' : v); if(typeof v==='string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s; return `"${s.replace(/"/g,'""')}"`; };
-  const csv = '\ufeff' + rows.map(r=>r.map(cell).join(',')).join('\n');
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
 }
