@@ -19,7 +19,7 @@ AP.disc = s => (s.discount ? +s.discount.amount || 0 : 0);
 AP.gross = s => (+s.subtotal || 0) + AP.disc(s);          // line total before any discount
 (function css() {
   const st = document.createElement('style');
-  st.textContent = '.ap-c{width:28px}#salesLogBody td{vertical-align:top}#apBar{gap:6px;flex-wrap:wrap;align-items:center}#apChip{position:fixed;left:8px;bottom:104px;z-index:61;font:600 12px sans-serif;padding:6px 12px;border-radius:99px;border:1px solid #c9a227;background:#fff7dc;color:#5c4400;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}.ap-req{border:1px solid var(--paper-line,#ddd);border-radius:10px;padding:10px;margin:8px 0;text-align:left}.ap-req small{color:var(--muted,#666)}';
+  st.textContent = '.ap-c{display:none}.ap-on .ap-c{display:table-cell;width:28px}#salesLogBody td{vertical-align:top}#apBar{gap:6px;flex-wrap:wrap;align-items:center}#apChip{position:fixed;left:8px;bottom:104px;z-index:61;font:600 12px sans-serif;padding:6px 12px;border-radius:99px;border:1px solid #c9a227;background:#fff7dc;color:#5c4400;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}.ap-req{border:1px solid var(--paper-line,#ddd);border-radius:10px;padding:10px;margin:8px 0;text-align:left}.ap-req small{color:var(--muted,#666)}';
   document.head.append(st);
 })();
 
@@ -157,7 +157,7 @@ AP.pick = (id, on) => { on ? AP.sel.add(id) : AP.sel.delete(id); AP.bar(); };
 AP.toggleMode = () => { AP.selMode = !AP.selMode; if (!AP.selMode) AP.sel.clear(); AP.renderLog(); };
 AP.all = () => { AP.shown.filter(s => !s.refunded).forEach(s => AP.sel.add(s.id)); AP.renderLog(); };
 AP.none = () => { AP.sel.clear(); AP.renderLog(); };
-AP.bar = () => {   const b = document.getElementById('apBar'); if (!b) return;   const n = AP.sel.size, off = n ? '' : 'disabled';   b.innerHTML = `<span class="helptext" style="margin:0"><b>${n}</b> selected</span><button class="btn sm ghost" onclick="AP.all()">Select all shown</button><button class="btn sm ghost" ${off} onclick="AP.none()">Clear</button><button class="btn sm gold" ${off} onclick="AP.combined()">🧾 Generate receipt</button><button class="btn sm gold" ${off} onclick="AP.invoice()">📄 Generate invoice</button>`;   const all = document.getElementById('apAll'), ids = (AP.shown || []).filter(s => !s.refunded);   if (all) all.checked = ids.length > 0 && ids.every(s => AP.sel.has(s.id)); }; AP.allToggle = on => { (AP.shown || []).filter(s => !s.refunded).forEach(s => on ? AP.sel.add(s.id) : AP.sel.delete(s.id)); AP.renderLog(); }; AP.barOld = () => {
+AP.bar = () => {
   const b = document.getElementById('apBar'); if (!b) return;
   const n = AP.sel.size;
   b.innerHTML = AP.selMode
@@ -177,10 +177,10 @@ AP.renderLog = () => {
   const table = body.closest('table'), wrap = table.closest('.tablewrap');
   table.classList.toggle('ap-on', AP.selMode);
   const hr = table.querySelector('thead tr');
-  if (hr) hr.innerHTML = '<th class="ap-c"><input type="checkbox" id="apAll" title="Select all shown" onchange="AP.allToggle(this.checked)"></th><th>Receipt #</th><th>Time</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th>';
+  if (hr) hr.innerHTML = '<th class="ap-c"></th><th>Receipt #</th><th>Time</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th>';
   if (!document.getElementById('apBar')) { const bar = document.createElement('div'); bar.id = 'apBar'; bar.className = 'searchbar'; wrap.parentNode.insertBefore(bar, wrap); }
   AP.bar();
-  const list = filteredSalesLog().list.slice().reverse(); AP.shown = list; setTimeout(AP.bar, 0);
+  const list = filteredSalesLog().list.slice().reverse(); AP.shown = list;
   body.innerHTML = list.map(s => {
     const pend = s.discountStatus === 'Pending', rej = s.discountStatus === 'Rejected';
     const act = (s.refunded ? '<span class="pill low">Refunded</span>' : `<button class="btn sm ghost" onclick="refundSale('${esc(s.id)}')">Refund</button>`)
@@ -263,7 +263,89 @@ AP.invoice = () => {
   logActivity(`Printed invoice ${no} for ${list.map(s => s.id).join(', ')}`);
 };
 
-/* ---------- 6. Type the quantity in the cart ---------- */ AP.setQty = (id, v) => {   const line = cart.find(c => c.id === id), item = items.find(i => i.id === id);   if (!line || !item) return;   const n = Math.floor(Number(v)), max = itemAvailable(item);   if (v === '' || isNaN(n)) return renderCart();   if (n <= 0 || max < 1) cart = cart.filter(c => c.id !== id);   else if (n > max) { line.qty = max; AP.toast(`Only ${max} in stock.`); }   else line.qty = n;   renderCart(); };  /* first look after sign-in */
+/* ---------- 6. Type the quantity in the cart ---------- */ AP.setQty = (id, v) => {   const line = cart.find(c => c.id === id), item = items.find(i => i.id === id);   if (!line || !item) return;   const n = Math.floor(Number(v)), max = itemAvailable(item);   if (v === '' || isNaN(n)) return renderCart();   if (n <= 0 || max < 1) cart = cart.filter(c => c.id !== id);   else if (n > max) { line.qty = max; AP.toast(`Only ${max} in stock.`); }   else line.qty = n;   renderCart(); };  /* ---------- 7. Audit log: click a row for a plain-English explanation ---------- */
+AP.nice = s => String(s || '').replace(/CostPrice/g, 'cost price').replace(/SellingPrice/g, 'selling price').replace(/ReorderThreshold/g, 'reorder level')
+  .replace(/CurrentStock/g, 'stock count').replace(/ExpiryDate/g, 'expiry date').replace(/TrackBatches/g, 'batch tracking').replace(/PhotoURL/g, 'photo')
+  .replace(/BundleJSON/g, 'bundle contents').replace(/\bKind\b/g, 'type').replace(/\bBarcode\b/g, 'barcode').replace(/\bUnit\b/g, 'unit').replace(/\bCategory\b/g, 'category')
+  .replace(/\bBranch\b/g, 'branch').replace(/\bName\b/g, 'name');
+// [pattern, title, what it means, optional flag text]. First match wins.
+AP.rules = [
+  [/^Failed login/i, 'Wrong password tried', 'Someone tried to sign in with a wrong staff ID or password.', 'If this keeps happening for the same ID, reset that person\'s password.'],
+  [/^Blocked action/i, 'Action blocked', 'Someone tried to do something their account is not allowed to do. The system stopped it.', 'Worth asking the person what they were trying to do.'],
+  [/^Login/i, 'Signed in', 'This person signed in to the app.'],
+  [/^Registered sale|^Sale registered/i, 'Sale made', 'A sale was recorded and the stock was reduced.'],
+  [/^Printed receipt|^Reprinted receipt|^Printed combined|^Printed invoice/i, 'Receipt or invoice printed', 'A receipt or invoice was printed or shown again. Nothing was changed.'],
+  [/^Refunded sale|^Sale voided/i, 'Sale cancelled', 'A sale was cancelled and the items went back into stock.', 'Cancelled sales are worth a quick check.'],
+  [/^Discount requested/i, 'Discount asked for', 'A staff member asked for a discount on a sale. It waits for an admin to approve.'],
+  [/^Discount approved|^Approved discount/i, 'Discount approved', 'An admin approved a discount. The sale total went down by that amount.'],
+  [/^Discount rejected|^Rejected discount/i, 'Discount rejected', 'An admin said no to a discount. The sale stays at full price.'],
+  [/^Discount authorized/i, 'Discount approved with admin password', 'An admin approved a discount by entering his password.'],
+  [/^Oversold/i, 'Sold more than was in stock', 'Two phones sold the last items at about the same time, so the stock count went below zero.', 'Count the shelf and correct the stock.'],
+  [/^Negative stock/i, 'Stock went below zero', 'After this change the stock count is less than zero.', 'Count the shelf and correct the stock.'],
+  [/^Cash mismatch|^Closed the day/i, 'Day closed', 'The cash was counted and compared with what the sales say it should be.'],
+  [/^Restocked/i, 'Stock added', 'New stock was added to a product.'],
+  [/^Item edited|^Edited "/i, 'Product changed', 'Something on a product was changed. The old and new values are shown below.'],
+  [/^Edit conflict/i, 'Two people edited the same product', 'Two phones changed the same product before they synced. The later change was kept.', 'Check the product to make sure it looks right.'],
+  [/^Item created|^Added new product/i, 'New product added', 'A new product was added to the list.'],
+  [/^Item removed|^Deleted product/i, 'Product removed', 'A product was taken off the stock list. Past sales still keep its name.'],
+  [/^Item restored/i, 'Product brought back', 'A removed product was put back on the stock list.'],
+  [/^Item photo changed|^Business logo changed/i, 'Photo changed', 'A product photo or the business logo was changed.'],
+  [/^Imported products/i, 'Products imported from a file', 'Several products were added or restocked from a file in one go.'],
+  [/^Expense added|^Logged expense/i, 'Expense recorded', 'Money spent by the business was written down.'],
+  [/^Expense reversed|^Deleted expense/i, 'Expense removed', 'An expense was cancelled. The original entry is kept with a reversal beside it.'],
+  [/^Customer added|^Added customer/i, 'Customer added', 'A new customer was added to the debtors list.'],
+  [/^Debtor payment|^Recorded payment/i, 'Customer paid', 'A customer paid part or all of what they owe.'],
+  [/^Staff added/i, 'New staff account', 'A new staff or admin account was created.'],
+  [/^Staff deleted/i, 'Staff account deleted', 'A staff account was deleted and can no longer sign in.'],
+  [/^Staff deactivated|^Deactivated account/i, 'Account switched off', 'This person can no longer sign in until the account is switched back on.'],
+  [/^Staff reactivated|^Reactivated account/i, 'Account switched on', 'This person can sign in again.'],
+  [/^Staff edited/i, 'Staff account changed', 'A staff member\'s name or role was changed.'],
+  [/^Passcode reset|^Reset password/i, 'Password reset', 'A new password was given to this person. The old one no longer works.'],
+  [/^Passcode changed/i, 'Password changed', 'This person changed their own password.'],
+  [/^Access changed/i, 'Staff access changed', 'The list of things this staff member is allowed to do was changed.'],
+  [/^Setting changed|^Added branch|^Removed branch/i, 'Setting changed', 'A business setting was changed.'],
+  [/^Payment receipt submitted/i, 'Subscription payment sent', 'A payment receipt was sent for the app subscription.'],
+  [/^Exported/i, 'Data exported', 'Information was downloaded as a file.']
+];
+AP.explain = a => {
+  const text = AP.nice(a).replace(/\(([^()]*?) to ([^()]*?)\)/g, '— changed from $1 to $2'), r = AP.rules.find(x => x[0].test(a));
+  const m = /^([^(:]*?)(?: \(([^)]*)\))?(?:: (.*))?$/.exec(text) || [];
+  return { title: r ? r[1] : 'Activity', what: r ? r[2] : 'This action was recorded by the system.', flag: r && r[3] || '', headline: (m[1] || text).trim(), extra: [m[2], m[3]].filter(Boolean).join(' · ') };
+};
+AP.when = e => { const d = e.iso ? new Date(e.iso) : null; return d && !isNaN(d) ? d.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : e.time; };
+AP.logAt = i => AP.logList[i];
+AP.logOpen = i => {
+  const e = AP.logAt(i); if (!e) return;
+  const x = AP.explain(e.action), who = String(e.user || '').replace(/\s*\((.*)\)$/, ''), id = (/\((.*)\)$/.exec(e.user || '') || [])[1] || '';
+  ssOverlay(`<h3 style="margin-top:0">${esc(x.title)}</h3>
+    <p style="margin:6px 0">${esc(x.what)}</p>
+    ${x.flag ? `<p style="margin:6px 0;padding:8px;border-radius:8px;background:#fff7dc;color:#5c4400;font-size:13px">⚠ ${esc(x.flag)}</p>` : ''}
+    <div class="ap-req"><div><small>Who</small><br><b>${esc(who)}</b>${id ? ` <small>(${esc(id)}, ${e.role === 'admin' ? 'admin' : esc(e.role)})</small>` : ''}</div>
+    <div style="margin-top:6px"><small>When</small><br><b>${esc(AP.when(e))}</b></div>
+    <div style="margin-top:6px"><small>What was recorded</small><br>${esc(x.headline)}${x.extra ? `<br><span style="color:var(--muted,#666)">${esc(x.extra)}</span>` : ''}</div></div>
+    <div class="row"><button class="btn ghost" onclick="ssClose()">Close</button></div>`, true);
+};
+{
+  const _ra = renderActivity;
+  renderActivity = function () {
+    if (role() !== 'admin') return;
+    AP.logList = activityLog.slice().reverse();
+    document.getElementById('activityBody').innerHTML = AP.logList.map((e, i) =>
+      `<tr style="cursor:pointer" onclick="AP.logOpen(${i})"><td class="mono">${esc(e.time)}</td><td>${esc(e.user)}</td><td><span class="rolebadge ${esc(e.role)}">${esc(e.role)}</span></td><td>${esc(e.action)} <small style="color:var(--muted,#666)">›</small></td></tr>`).join('')
+      || '<tr><td colspan="4" style="color:var(--muted);">No activity yet.</td></tr>';
+  };
+  // keep the full date and time on every entry so the detail card can show it
+  const _la = logActivity;
+  logActivity = function (a) { _la.apply(this, arguments); const last = activityLog[activityLog.length - 1]; if (last && !last.iso) last.iso = new Date().toISOString(); };
+  const _ma = SY.mAudit;
+  SY.mAudit = function (rows) {
+    _ma.apply(SY, arguments);
+    const all = ssGet('ss_audit', []).slice().sort((a, b) => a.t < b.t ? -1 : 1);
+    activityLog.forEach((e, i) => { if (all[i]) e.iso = all[i].t; });
+  };
+}
+
+/* first look after sign-in */
 setTimeout(() => { if (currentUser) { AP.refresh(); AP.loadPending(); } }, 4000);
 
 /* ---------- 6. Approvals tab (admin only) ---------- */
