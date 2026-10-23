@@ -19,7 +19,7 @@ AP.disc = s => (s.discount ? +s.discount.amount || 0 : 0);
 AP.gross = s => (+s.subtotal || 0) + AP.disc(s);          // line total before any discount
 (function css() {
   const st = document.createElement('style');
-  st.textContent = '.ap-c{display:none}.ap-on .ap-c{display:table-cell;width:28px}#salesLogBody td{vertical-align:top}#apBar{gap:6px;flex-wrap:wrap;align-items:center}#apChip{position:fixed;left:8px;bottom:104px;z-index:61;font:600 12px sans-serif;padding:6px 12px;border-radius:99px;border:1px solid #c9a227;background:#fff7dc;color:#5c4400;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}.ap-req{border:1px solid var(--paper-line,#ddd);border-radius:10px;padding:10px;margin:8px 0;text-align:left}.ap-req small{color:var(--muted,#666)}';
+  st.textContent = '.ap-c{width:28px}#salesLogBody td{vertical-align:top}#apBar{gap:6px;flex-wrap:wrap;align-items:center}#apChip{position:fixed;left:8px;bottom:104px;z-index:61;font:600 12px sans-serif;padding:6px 12px;border-radius:99px;border:1px solid #c9a227;background:#fff7dc;color:#5c4400;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}.ap-req{border:1px solid var(--paper-line,#ddd);border-radius:10px;padding:10px;margin:8px 0;text-align:left}.ap-req small{color:var(--muted,#666)}';
   document.head.append(st);
 })();
 
@@ -159,11 +159,12 @@ AP.all = () => { AP.shown.filter(s => !s.refunded).forEach(s => AP.sel.add(s.id)
 AP.none = () => { AP.sel.clear(); AP.renderLog(); };
 AP.bar = () => {
   const b = document.getElementById('apBar'); if (!b) return;
-  const n = AP.sel.size;
-  b.innerHTML = AP.selMode
-    ? `<button class="btn sm gold" onclick="AP.toggleMode()">✔ Done selecting</button><button class="btn sm ghost" onclick="AP.all()">Select all shown</button><button class="btn sm ghost" onclick="AP.none()">Clear</button><span class="helptext" style="margin:0">${n} selected</span><button class="btn sm ghost" ${n ? '' : 'disabled'} onclick="AP.combined()">🧾 Combined receipt</button><button class="btn sm ghost" ${n ? '' : 'disabled'} onclick="AP.invoice()">📄 Invoice</button>`
-    : `<button class="btn sm ghost" onclick="AP.toggleMode()">☑ Select sales</button><span class="helptext" style="margin:0">Tick several sales to print one combined receipt or an invoice. Use Receipt on any row to reprint it.</span>`;
+  const n = AP.sel.size, off = n ? '' : 'disabled';
+  b.innerHTML = `<span class="helptext" style="margin:0"><b>${n}</b> selected</span><button class="btn sm ghost" onclick="AP.all()">Select all shown</button><button class="btn sm ghost" ${off} onclick="AP.none()">Clear</button><button class="btn sm gold" ${off} onclick="AP.combined()">🧾 Generate receipt</button><button class="btn sm gold" ${off} onclick="AP.invoice()">📄 Generate invoice</button>`;
+  const all = document.getElementById('apAll'), ids = (AP.shown || []).filter(s => !s.refunded);
+  if (all) all.checked = ids.length > 0 && ids.every(s => AP.sel.has(s.id));
 };
+AP.allToggle = on => { (AP.shown || []).filter(s => !s.refunded).forEach(s => on ? AP.sel.add(s.id) : AP.sel.delete(s.id)); AP.renderLog(); };
 AP.looksLikeCode = v => /^(I-[A-Za-z0-9]+-\d+(-[A-Za-z0-9]+)?|[A-Z]{1,3}-[A-Z0-9]{6,}|\d{6,})$/.test(String(v == null ? '' : v).trim());
 AP.itemName = l => {   // the real item or service name for a sale line, even if the line only holds an ID or barcode
   const raw = String(l.name == null ? '' : l.name).trim();
@@ -177,10 +178,10 @@ AP.renderLog = () => {
   const table = body.closest('table'), wrap = table.closest('.tablewrap');
   table.classList.toggle('ap-on', AP.selMode);
   const hr = table.querySelector('thead tr');
-  if (hr) hr.innerHTML = '<th class="ap-c"></th><th>Receipt #</th><th>Time</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th>';
+  if (hr) hr.innerHTML = '<th class="ap-c"><input type="checkbox" id="apAll" title="Select all shown" onchange="AP.allToggle(this.checked)"></th><th>Receipt #</th><th>Time</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th>';
   if (!document.getElementById('apBar')) { const bar = document.createElement('div'); bar.id = 'apBar'; bar.className = 'searchbar'; wrap.parentNode.insertBefore(bar, wrap); }
   AP.bar();
-  const list = filteredSalesLog().list.slice().reverse(); AP.shown = list;
+  const list = filteredSalesLog().list.slice().reverse(); AP.shown = list; setTimeout(AP.bar, 0);
   body.innerHTML = list.map(s => {
     const pend = s.discountStatus === 'Pending', rej = s.discountStatus === 'Rejected';
     const act = (s.refunded ? '<span class="pill low">Refunded</span>' : `<button class="btn sm ghost" onclick="refundSale('${esc(s.id)}')">Refund</button>`)
@@ -263,7 +264,19 @@ AP.invoice = () => {
   logActivity(`Printed invoice ${no} for ${list.map(s => s.id).join(', ')}`);
 };
 
-/* ---------- 6. Type the quantity in the cart ---------- */ AP.setQty = (id, v) => {   const line = cart.find(c => c.id === id), item = items.find(i => i.id === id);   if (!line || !item) return;   const n = Math.floor(Number(v)), max = itemAvailable(item);   if (v === '' || isNaN(n)) return renderCart();   if (n <= 0 || max < 1) cart = cart.filter(c => c.id !== id);   else if (n > max) { line.qty = max; AP.toast(`Only ${max} in stock.`); }   else line.qty = n;   renderCart(); };  /* ---------- 7. Audit log: click a row for a plain-English explanation ---------- */
+/* ---------- 6. Type the quantity in the cart ---------- */
+AP.setQty = (id, v) => {
+  const line = cart.find(c => c.id === id), item = items.find(i => i.id === id);
+  if (!line || !item) return;
+  const n = Math.floor(Number(v)), max = itemAvailable(item);
+  if (v === '' || isNaN(n)) return renderCart();
+  if (n <= 0 || max < 1) cart = cart.filter(c => c.id !== id);
+  else if (n > max) { line.qty = max; AP.toast(`Only ${max} in stock.`); }
+  else line.qty = n;
+  renderCart();
+};
+
+/* ---------- 7. Audit log: click a row for a plain-English explanation ---------- */
 AP.nice = s => String(s || '').replace(/CostPrice/g, 'cost price').replace(/SellingPrice/g, 'selling price').replace(/ReorderThreshold/g, 'reorder level')
   .replace(/CurrentStock/g, 'stock count').replace(/ExpiryDate/g, 'expiry date').replace(/TrackBatches/g, 'batch tracking').replace(/PhotoURL/g, 'photo')
   .replace(/BundleJSON/g, 'bundle contents').replace(/\bKind\b/g, 'type').replace(/\bBarcode\b/g, 'barcode').replace(/\bUnit\b/g, 'unit').replace(/\bCategory\b/g, 'category')
@@ -348,7 +361,7 @@ AP.logOpen = i => {
 /* first look after sign-in */
 setTimeout(() => { if (currentUser) { AP.refresh(); AP.loadPending(); } }, 4000);
 
-/* ---------- 6. Approvals tab (admin only) ---------- */
+/* ---------- 8. Approvals tab (admin only) ---------- */
 AP.after = () => { if (AP.viewActive()) AP.renderView(); else AP.pending.length ? AP.open() : ssClose(); };
 AP.renderView = () => {
   const box = document.getElementById('apList'); if (!box || !AP.viewActive()) return;
