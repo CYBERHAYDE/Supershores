@@ -122,7 +122,7 @@ SY.mSales=p=>{const lines={},cust={},dn={};debtors.forEach(d=>{if(d.sid)cust[d.s
  p.voids.forEach(v=>{const s=sales.find(x=>x.id===v.SaleID);if(s)s.refunded=true;});};
 SY.mExp=list=>{let n=Math.max(0,...expenses.map(e=>syNum(e.id)));
  list.forEach(x=>{if(x.ReversesExpenseID){expenses=expenses.filter(e=>e.sid!==x.ReversesExpenseID);return;}if(expenses.some(e=>e.sid===x.ExpenseID))return;
-  expenses.push({id:'EX-'+String(++n).padStart(3,'0'),sid:x.ExpenseID,category:x.Category,amount:+x.Amount,isoDate:x.Date,loggedBy:(users.find(z=>z.id===x.LoggedBy)?users.find(z=>z.id===x.LoggedBy).name+' ('+x.LoggedBy+')':x.LoggedBy),note:x.Notes});});};
+  expenses.push({id:'EX-'+String(++n).padStart(3,'0'),sid:x.ExpenseID,category:x.Category,amount:+x.Amount,isoDate:normDate(x.Date)||x.Date,,loggedBy:(users.find(z=>z.id===x.LoggedBy)?users.find(z=>z.id===x.LoggedBy).name+' ('+x.LoggedBy+')':x.LoggedBy),note:x.Notes});});};
 SY.mAudit=rows=>{const all=ssGet('ss_audit',[]).concat(rows.map(r=>({t:r.Timestamp,u:`${r.StaffName} (${r.StaffID})`,r:r.RoleAtTime==='owner'?'admin':(r.RoleAtTime||'—'),a:r.Action+(r.NewValue!==''&&r.OldValue!==''?` (${r.OldValue} to ${r.NewValue})`:r.NewValue!==''?` (${r.NewValue})`:'')+(r.Details?': '+r.Details:'')}))).slice(-600);
  ssSet('ss_audit',all);activityLog=all.slice().sort((a,b)=>a.t<b.t?-1:1).map(x=>({time:new Date(x.t).toLocaleString('en-NG',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}),user:x.u,role:x.r,action:x.a}));};
 
