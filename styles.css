@@ -182,7 +182,7 @@
 
   @media print{ body *{ visibility:hidden; } .receipt, .receipt *{ visibility:visible; } .receipt{ position:fixed; top:0; left:50%; transform:translateX(-50%); box-shadow:none; }
     .report-print, .report-print *{ visibility:visible; } .report-print{ position:fixed; top:0; left:0; width:100%; box-shadow:none; }
-    .overlay{ background:none; } }   /* Printing a report or invoice: let it flow over as many pages as it needs */   @media print{     body:has(#reportPrintOverlay.active) > *:not(#reportPrintOverlay){ display:none !important; }     #reportPrintOverlay.active{ display:block !important; position:static !important; padding:0 !important; overflow:visible !important; background:none !important; }     #reportPrintOverlay .receipt-wrap{ max-width:none !important; width:100% !important; }     #reportPrintOverlay .receipt-actions{ display:none !important; }     .report-print{ position:static !important; padding:0 !important; }     .report-print thead{ display:table-header-group; }     .report-print tr{ break-inside:avoid; page-break-inside:avoid; }   }
+    .overlay{ background:none; } }
   .report-print{ width:100%; background:var(--white); padding:28px 26px; font-family:'IBM Plex Sans'; color:var(--charcoal); box-shadow:var(--shadow-lg); border-radius:10px; }
   .report-print .rp-head{ display:flex; align-items:center; gap:12px; border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:16px; }
   .report-print .rp-head img{ max-height:44px; max-width:110px; object-fit:contain; }
