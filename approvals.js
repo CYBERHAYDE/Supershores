@@ -19,7 +19,7 @@ AP.disc = s => (s.discount ? +s.discount.amount || 0 : 0);
 AP.gross = s => (+s.subtotal || 0) + AP.disc(s);          // line total before any discount
 (function css() {
   const st = document.createElement('style');
-  st.textContent = '.ap-c{display:none}.ap-on .ap-c{display:table-cell;width:28px}#salesLogBody td{vertical-align:top}#apBar{gap:6px;flex-wrap:wrap;align-items:center}#apChip{position:fixed;left:8px;bottom:104px;z-index:61;font:600 12px sans-serif;padding:6px 12px;border-radius:99px;border:1px solid #c9a227;background:#fff7dc;color:#5c4400;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}.ap-req{border:1px solid var(--paper-line,#ddd);border-radius:10px;padding:10px;margin:8px 0;text-align:left}.ap-req small{color:var(--muted,#666)}';
+  st.textContent = '.ap-c{width:28px}#salesLogBody td{vertical-align:top}#apBar{gap:6px;flex-wrap:wrap;align-items:center}#apChip{position:fixed;left:8px;bottom:104px;z-index:61;font:600 12px sans-serif;padding:6px 12px;border-radius:99px;border:1px solid #c9a227;background:#fff7dc;color:#5c4400;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}.ap-req{border:1px solid var(--paper-line,#ddd);border-radius:10px;padding:10px;margin:8px 0;text-align:left}.ap-req small{color:var(--muted,#666)}';
   document.head.append(st);
 })();
 
@@ -157,7 +157,7 @@ AP.pick = (id, on) => { on ? AP.sel.add(id) : AP.sel.delete(id); AP.bar(); };
 AP.toggleMode = () => { AP.selMode = !AP.selMode; if (!AP.selMode) AP.sel.clear(); AP.renderLog(); };
 AP.all = () => { AP.shown.filter(s => !s.refunded).forEach(s => AP.sel.add(s.id)); AP.renderLog(); };
 AP.none = () => { AP.sel.clear(); AP.renderLog(); };
-AP.bar = () => {
+AP.bar = () => {   const b = document.getElementById('apBar'); if (!b) return;   const n = AP.sel.size, off = n ? '' : 'disabled';   b.innerHTML = `<span class="helptext" style="margin:0"><b>${n}</b> selected</span><button class="btn sm ghost" onclick="AP.all()">Select all shown</button><button class="btn sm ghost" ${off} onclick="AP.none()">Clear</button><button class="btn sm gold" ${off} onclick="AP.combined()">🧾 Generate receipt</button><button class="btn sm gold" ${off} onclick="AP.invoice()">📄 Generate invoice</button>`;   const all = document.getElementById('apAll'), ids = (AP.shown || []).filter(s => !s.refunded);   if (all) all.checked = ids.length > 0 && ids.every(s => AP.sel.has(s.id)); }; AP.allToggle = on => { (AP.shown || []).filter(s => !s.refunded).forEach(s => on ? AP.sel.add(s.id) : AP.sel.delete(s.id)); AP.renderLog(); }; AP.barOld = () => {
   const b = document.getElementById('apBar'); if (!b) return;
   const n = AP.sel.size;
   b.innerHTML = AP.selMode
@@ -177,10 +177,10 @@ AP.renderLog = () => {
   const table = body.closest('table'), wrap = table.closest('.tablewrap');
   table.classList.toggle('ap-on', AP.selMode);
   const hr = table.querySelector('thead tr');
-  if (hr) hr.innerHTML = '<th class="ap-c"></th><th>Receipt #</th><th>Time</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th>';
+  if (hr) hr.innerHTML = '<th class="ap-c"><input type="checkbox" id="apAll" title="Select all shown" onchange="AP.allToggle(this.checked)"></th><th>Receipt #</th><th>Time</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th>';
   if (!document.getElementById('apBar')) { const bar = document.createElement('div'); bar.id = 'apBar'; bar.className = 'searchbar'; wrap.parentNode.insertBefore(bar, wrap); }
   AP.bar();
-  const list = filteredSalesLog().list.slice().reverse(); AP.shown = list;
+  const list = filteredSalesLog().list.slice().reverse(); AP.shown = list; setTimeout(AP.bar, 0);
   body.innerHTML = list.map(s => {
     const pend = s.discountStatus === 'Pending', rej = s.discountStatus === 'Rejected';
     const act = (s.refunded ? '<span class="pill low">Refunded</span>' : `<button class="btn sm ghost" onclick="refundSale('${esc(s.id)}')">Refund</button>`)
