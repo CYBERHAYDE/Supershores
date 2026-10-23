@@ -49,7 +49,7 @@ let users = JSON.parse(SSLS.getItem('ch_users') || '[]');
 (function tidySavedData(){
   sales.forEach(s=>{ if(!Array.isArray(s.lines)) s.lines = []; });
   debtors.forEach(d=>{ if(!Array.isArray(d.history)) d.history = []; d.balance = +d.balance || 0; });
-  expenses.forEach(e=>{ e.amount = +e.amount || 0; });
+  expenses.forEach(e=>{ e.amount = +e.amount || 0; e.isoDate = normDate(e.isoDate) || e.isoDate; });
 })();
 let activityLog = JSON.parse(SSLS.getItem('ch_log') || '[]');
 let currentUser = JSON.parse(sessionStorage.getItem('ch_current') || 'null');
@@ -1331,11 +1331,11 @@ function renderCloseDay(){
   const lowStock = items.filter(i=>!i.service&&!i.bundle&&i.stock<=i.reorder).length;
   document.getElementById('closeCards').innerHTML = `
     <div class="card"><div class="k">${t('cardTotalSalesToday')}</div><div class="v">${naira(total)}</div></div>
-    <div class="card"><div class="k">${t('cardCashSalesToday')}</div><div class="v good">${naira(cashTotal)}</div></div>
+    <div class="card"><div class="k">${t('cardCashSalesToday')}</div><div class="v good">${naira(cashTotal)}</div></div>     <div class="card"><div class="k">Expenses Today</div><div class="v alert">${naira(cashOutToday())}</div></div>
     <div class="card"><div class="k">${t('cardLowStockItems')}</div><div class="v ${lowStock?'alert':'good'}">${lowStock}</div></div>`;
   const cashOut = cashOutToday(), expectedCash = cashTotal - cashOut;
   document.getElementById('expectedCashNote').textContent = cashOut>0 ? `Expected cash in till: ${naira(cashTotal)} cash sales minus ${naira(cashOut)} expenses paid today = ${naira(expectedCash)}` : `Expected cash in till from today's Cash sales: ${naira(cashTotal)}`;
-  window._expectedCash = expectedCash;
+  let expList = document.getElementById('closeExpList');   if(!expList){ expList = document.createElement('div'); expList.id = 'closeExpList'; expList.style.cssText = 'margin:8px 0;font-size:13px;'; document.getElementById('expectedCashNote').insertAdjacentElement('afterend', expList); }   const todayExp = expenses.filter(e=>e.isoDate===todayIso());   expList.innerHTML = todayExp.length ? '<b>Expenses paid today</b><br>' + todayExp.map(e=>`• ${esc(e.category)}${e.note?' — '+esc(e.note):''}: ${naira(e.amount)} <small style="color:var(--muted)">(${esc(e.loggedBy)})</small>`).join('<br>') : '';   window._expectedCash = expectedCash;
   updateCashDiff();
 }
 function updateCashDiff(){
@@ -1388,7 +1388,7 @@ function printCloseDay(){
     [
       ['Total sales today', naira(total)],
       ['Cash sales today', naira(cashTotal)],
-      ['Expenses paid today', naira(cashOutToday())],
+      ['Expenses paid today', naira(cashOutToday())],       ...expenses.filter(e=>e.isoDate===todayIso()).map(e=>['– '+esc(e.category)+(e.note?' — '+esc(e.note):''), naira(e.amount)]),
       ['Expected cash in till', naira(cashTotal-cashOutToday())],
       ['Cash counted in till', counted ? naira(counted) : '—'],
       ['Difference vs expected', counted ? naira(counted-(cashTotal-cashOutToday())) : '—'],
