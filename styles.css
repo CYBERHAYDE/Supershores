@@ -191,7 +191,7 @@
     #reportPrintOverlay .receipt-actions{ display:none !important; }
     .report-print{ position:static !important; padding:0 !important; }
     .report-print thead{ display:table-header-group; }
-    .report-print tr{ break-inside:avoid; page-break-inside:avoid; }
+    .report-print tr{ break-inside:avoid; page-break-inside:avoid; }     body:has(#receiptOverlay.active) > *:not(#receiptOverlay){ display:none !important; }     #receiptOverlay.active{ display:block !important; position:static !important; padding:0 !important; overflow:visible !important; background:none !important; }     #receiptOverlay .receipt-wrap{ max-width:none !important; width:auto !important; }     #receiptOverlay .receipt-actions{ display:none !important; }     #receiptOverlay .receipt{ position:static !important; transform:none !important; margin:0 auto !important; }     #receiptOverlay .receipt .rmeta, #receiptOverlay .receipt .rline{ break-inside:avoid; page-break-inside:avoid; }
   }
   .report-print{ width:100%; background:var(--white); padding:28px 26px; font-family:'IBM Plex Sans'; color:var(--charcoal); box-shadow:var(--shadow-lg); border-radius:10px; }
   .report-print .rp-head{ display:flex; align-items:center; gap:12px; border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:16px; }
