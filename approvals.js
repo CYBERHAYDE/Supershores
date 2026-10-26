@@ -181,21 +181,21 @@ AP.renderLog = () => {
   if (hr) hr.innerHTML = '<th class="ap-c"><input type="checkbox" id="apAll" title="Select all shown" onchange="AP.allToggle(this.checked)"></th><th>Receipt #</th><th>Time</th><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th>';
   if (!document.getElementById('apBar')) { const bar = document.createElement('div'); bar.id = 'apBar'; bar.className = 'searchbar'; wrap.parentNode.insertBefore(bar, wrap); }
   AP.bar();
-  const list = filteredSalesLog().list.slice().reverse(); AP.shown = list; setTimeout(AP.bar, 0);
+  const F = filteredSalesLog(), narrowed = !!(F.fb || F.fc), list = F.list.slice().reverse(); AP.shown = list; setTimeout(AP.bar, 0);
   body.innerHTML = list.map(s => {
     const pend = s.discountStatus === 'Pending', rej = s.discountStatus === 'Rejected';
     const act = (s.refunded ? '<span class="pill low">Refunded</span>' : `<button class="btn sm ghost" onclick="refundSale('${esc(s.id)}')">Refund</button>`)
       + ` <button class="btn sm ghost" onclick="AP.reprint('${esc(s.id)}')">🖨 Receipt</button>`
       + (pend ? ' <span class="pill low">Discount pending</span>' : rej ? ' <span class="pill low">Discount rejected</span>' : '');
-    const L = (s.lines && s.lines.length) ? s.lines : [null], rs = L.length > 1 ? ` rowspan="${L.length}"` : '';
+    const allL = (s.lines && s.lines.length) ? s.lines : [null], part = narrowed ? allL.filter(l => l && F.hit(l)) : allL, L = part.length ? part : [null], shownTotal = narrowed ? part.reduce((a, l) => a + (l ? l.qty * l.price : 0), 0) : s.total, rs = L.length > 1 ? ` rowspan="${L.length}"` : '';
     const lineCells = l => l
       ? `<td style="max-width:240px;white-space:normal;line-height:1.35">${esc(AP.itemName(l))}</td><td style="text-align:right">${l.qty}</td><td class="mono" style="text-align:right">${naira(l.price)}</td>`
       : '<td colspan="3" style="color:var(--muted)">—</td>';
     return `<tr><td class="ap-c"${rs}><input type="checkbox" ${AP.sel.has(s.id) ? 'checked' : ''} ${s.refunded ? 'disabled' : ''} onchange="AP.pick('${esc(s.id)}',this.checked)"></td>`
       + `<td class="mono"${rs}>${esc(s.id)}</td><td${rs}>${esc(saleDay(s))} ${esc(s.time)}</td>${lineCells(L[0])}`
-      + `<td class="mono"${rs} style="text-align:right">${naira(s.total)}</td><td${rs}>${esc(s.payment)}</td><td${rs}>${esc(s.staff)}</td><td${rs}>${act}</td></tr>`
+      + `<td class="mono"${rs} style="text-align:right"${narrowed && shownTotal !== s.total ? ` title="Whole sale: ${naira(s.total)}"` : ''}>${naira(shownTotal)}</td><td${rs}>${esc(s.payment)}</td><td${rs}>${esc(s.staff)}</td><td${rs}>${act}</td></tr>`
       + L.slice(1).map(l => `<tr>${lineCells(l)}</tr>`).join('');
-  }).join('') || '<tr><td colspan="10" style="color:var(--muted);">No sales match.</td></tr>';
+  }).join('') + (narrowed && list.length ? `<tr><td class="ap-c"></td><td colspan="5" style="text-align:right"><b>Total for ${esc([F.fb, F.fc].filter(Boolean).join(' · '))} (refunds left out)</b></td><td class="mono" style="text-align:right"><b>${naira(F.matchTotal)}</b></td><td colspan="3"></td></tr>` : '') || '<tr><td colspan="10" style="color:var(--muted);">No sales match.</td></tr>';
 };
 { const _rsl = renderSalesLogFilter; renderSalesLogFilter = function () { _rsl(); AP.renderLog(); }; }   // the branch and category filters redraw the table through here
 { const _rr = renderReports; renderReports = function () { _rr(); AP.renderLog(); }; }
@@ -396,3 +396,21 @@ AP.refreshView = async () => {
 { const _sv = switchView; switchView = function (name) { _sv(name); if (name === 'approvals') AP.loadPending(); }; }
 { const _ra = renderAll; renderAll = function () { _ra(); AP.renderView(); }; }
 { const _arl = applyRoleLocks; applyRoleLocks = function () { _arl(); AP.badge(AP.pending.length, !!(currentUser && currentUser.role === 'admin')); }; }
+
+/* ---------- 9. Today's sales inside the Register Sale window (everyone) ---------- */
+AP.renderToday = () => {
+  const box = document.getElementById('todaySalesBody'); if (!box) return;
+  const list = sales.filter(s => s.isoDate === todayIso()).slice().reverse();
+  const live = list.filter(s => !s.refunded), total = live.reduce((a, s) => a + (+s.total || 0), 0);
+  document.getElementById('todaySalesNote').textContent = list.length ? `${live.length} sale${live.length === 1 ? '' : 's'} today, ${naira(total)} (refunds left out)` : '';
+  box.innerHTML = list.map(s => `<tr><td class="mono">${esc(s.id)}</td><td>${esc(s.time)}</td><td style="white-space:normal;max-width:260px;font-size:13px">${esc(AP.itemsText(s))}</td><td class="mono" style="text-align:right">${naira(s.total)}</td><td>${esc(s.payment)}</td><td>${esc(s.staff)}</td><td>${s.refunded ? '<span class="pill low">Refunded</span>' : s.discountStatus === 'Pending' ? '<span class="pill low">Discount pending</span>' : ''} <button class="btn sm ghost" onclick="AP.reprint('${esc(s.id)}')">🖨 Receipt</button></td></tr>`).join('')
+    || '<tr><td colspan="7" style="color:var(--muted)">No sales yet today.</td></tr>';
+};
+(function () {
+  const v = document.getElementById('view-sale'); if (!v) return;
+  const p = document.createElement('div'); p.className = 'panel'; p.id = 'todaySalesPanel'; p.style.marginTop = '14px';
+  p.innerHTML = '<h3 style="margin-top:0">Sales made today</h3><p class="helptext" id="todaySalesNote" style="margin:0 0 8px"></p><div class="tablewrap"><table><thead><tr><th>Receipt #</th><th>Time</th><th>Items</th><th style="text-align:right">Total</th><th>Payment</th><th>Staff</th><th></th></tr></thead><tbody id="todaySalesBody"></tbody></table></div>';
+  v.append(p);
+})();
+{ const _ra2 = renderAll; renderAll = function () { _ra2(); AP.renderToday(); }; }
+{ const _cs2 = completeSale; completeSale = function () { _cs2(); AP.renderToday(); }; }
