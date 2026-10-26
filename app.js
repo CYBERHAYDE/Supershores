@@ -1778,7 +1778,7 @@ function toggleServiceMode(){
 }
 /* ---- Sales Log: filter by branch and category ---- */
 function saleLineGroup(l){
-  const it = items.find(i=>i.name===l.name);
+  const it = (l.itemId!=null && items.find(i=>i.id===l.itemId)) || items.find(i=>i.name===l.name) || (window.AP && items.find(i=>i.name===AP.itemName(l)));
   return { br: (it && it.branch) || 'No branch', ct: (it && it.category) || 'Other' };
 }
 function filteredSalesLog(){
@@ -1787,7 +1787,7 @@ function filteredSalesLog(){
   const hit = l => { const g = saleLineGroup(l); return (!fb || g.br===fb) && (!fc || g.ct===fc); };
   const list = sales.filter(s=>inRange(s,range)).filter(s=>(!fb && !fc) || s.lines.some(hit));
   const matchTotal = (fb||fc) ? list.filter(s=>!s.refunded).reduce((a,s)=>a + s.lines.filter(hit).reduce((b,l)=>b + l.qty*l.price, 0), 0) : 0;
-  return { list, fb, fc, matchTotal };
+  return { list, fb, fc, matchTotal, hit };
 }
 function renderSalesLogFilter(){
   if(role()!=='admin') return;
@@ -1815,7 +1815,7 @@ function renderSalesLogFilter(){
 }
 { const _renderReports2 = renderReports; renderReports = function(){ _renderReports2(); renderSalesLogFilter(); }; }
 function printSalesLog(){
-  const range = getSelectedRange(), { list, fb, fc } = filteredSalesLog();
-  const rows = list.slice().reverse().flatMap(s=>{ const L=(s.lines&&s.lines.length)?s.lines:[null]; return L.map((l,i)=>[ i?'':s.id, i?'':`${saleDay(s)} ${s.time}`, l?esc(AP.itemName(l)):'—', l?l.qty:'', l?naira(l.price):'', i?'':naira(s.total), i?'':s.payment, i?'':esc(s.staff) ]); });
+  const range = getSelectedRange(), { list, fb, fc, hit } = filteredSalesLog(), lineOk = l => (!fb && !fc) || hit(l);
+  const rows = list.slice().reverse().flatMap(s=>{ const all=(s.lines&&s.lines.length)?s.lines:[null], part=all.filter(l=>!l||lineOk(l)), L=part.length?part:[null], tot=(fb||fc)?part.reduce((a,l)=>a+(l?l.qty*l.price:0),0):s.total; return L.map((l,i)=>[ i?'':s.id, i?'':`${saleDay(s)} ${s.time}`, l?esc(AP.itemName(l)):'—', l?l.qty:'', l?naira(l.price):'', i?'':naira(tot), i?'':s.payment, i?'':esc(s.staff) ]); });
   showPrintableReport('Sales Log', `${range.from} → ${range.to}${fb?' · '+esc(fb):''}${fc?' · '+esc(fc):''}`, ['Receipt #','Time','Item','Qty','Price','Total','Payment','Staff'], rows);
 }
