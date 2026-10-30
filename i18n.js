@@ -3,7 +3,7 @@ const I18N = {
   en:{ tagline:'Inventory · powered by CyberHayde', logout:'Log out',
     demoBanner:'This is a live, working <b>demo with sample data</b> — every business gets its own private setup like this, with their own products, staff accounts, and branding.',
     navDash:'Dashboard', navInv:'Inventory', navSale:'Register Sale', navReports:'Reports', navActivity:'Activity Log', navClose:'Close Day', navSettings:'Receipt Settings', more:'More',
-    dashTitle:'Today, at a glance', dashSub:'Updates the instant a sale happens — no refresh, and it works the same with no internet connection.',
+    dashTitle:'Today, at a glance', dashSub:'Updates as soon as a sale is saved on this device. Sales made offline sync when you are back online.',
     lowStockTitle:'Low stock — needs reordering soon', colStock:'In stock', colReorder:'Reorder at',
     invSub:'Instant search, scan a barcode, or add a brand new product — both Admin and Staff can add products; only Admin sets cost price.',
     searchPh:'Search by name, category, or barcode…', allCats:'All categories', scanBtn:'Scan', addItemBtn:'Add Item', addNewProduct:'Add a new product',
@@ -24,7 +24,7 @@ const I18N = {
     ownDesign:'Prefer your own design?', ownDesignSub:"Instead of customizing the fields above, upload a complete receipt template and we'll use your exact layout.", ownDesignNote:'(Upload is wired up in the real per-client build — disabled here since this is a shared demo.)',
     exportData:'Export your data', exportSub:'Your data is always yours — export it any time, no support ticket required.', exportInv:'Export Inventory CSV', exportSales:'Export Sales CSV',
     
-pitchFooter:"Powerful inventory management, built for the way your business works.<br>Every organization gets its own secure workspace, with dedicated data, custom branding, and staff access tailored to its needs.",
+pitchFooter:"Powerful inventory management, built for the way your business works.<br>Every organization gets its own workspace, with its own data, custom branding, and staff access tailored to its needs.",
 
     editBtn:'Edit', editTitle:'Edit price & stock', restockBtn:'Restock', restockTitle:'Add received stock', expiringSoon:'Expiring soon', waAdminBtn:'WhatsApp Admin',
     qtyReceived:'Qty received', supplierLabel:'Supplier', supplierOptional:'Supplier (optional)', newExpiryOptional:'New expiry (optional)', addStock:'Add stock', save:'Save',
