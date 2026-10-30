@@ -4,13 +4,13 @@
 const LG = window.LG = {
   CONFIG: {
     provider: 'CyberHayde',               // the company that builds and runs the app
-    providerEmail: '',                    // FILL IN: where privacy, deletion and refund requests go
-    providerWhatsApp: '',                 // FILL IN: digits only with country code, e.g. 2348012345678
-    updated: '27 October 2026',
+    providerEmail: 'umohambrose970@gmail.com',                    // FILL IN: where privacy, deletion and refund requests go
+    providerWhatsApp: '2348127784713',                 // FILL IN: digits only with country code, e.g. 2348012345678
+    updated: '30 October 2026',
     replyDays: 14,                        // how many days you promise to reply to a request
     refundDays: 14,                       // days to ask for a refund of a duplicate or wrong payment
     priceNoticeDays: 30,                  // how many days of warning you give before a price increase
-    policyVersion: '2026-10-27',          // CHANGE THIS whenever you change a policy. Everyone is asked to agree again
+    policyVersion: '2026-10-30',          // CHANGE THIS whenever you change a policy. Everyone is asked to agree again
     whatsNew: []                          // plain-English bullets shown as "What changed" when the version changes, e.g. ['Pricing: 30 days notice for increases']
   }
 };
