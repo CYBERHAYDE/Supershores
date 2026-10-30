@@ -41,7 +41,7 @@ renderAuthGate=function(view){const card=document.getElementById('authCard'),set
   <form autocomplete="on" onsubmit="event.preventDefault();submitLogin();"><div class="form-row"><label>Staff ID</label><input type="text" id="lId" autocapitalize="characters" autocomplete="username" placeholder="e.g. ST-001"></div>
   <div class="form-row"><label>Password</label><input type="password" id="lPass" autocomplete="current-password"></div>
   <div class="errtext" id="authErr"></div><button type="submit" class="btn gold" style="width:100%;margin-top:14px;">Log in</button></form>
-  <div class="switchline">First time setup? <a onclick="renderAuthGate('setup')">Owner setup</a></div>${window.LG?LG.linksHtml():’’}`;
+  <div class="switchline">First time setup? <a onclick="renderAuthGate('setup')">Owner setup</a></div>${window.LG?LG.linksHtml():[]}`;
  document.getElementById('authGate').style.visibility='visible';
  if(matchMedia('(hover:hover)').matches)setTimeout(()=>{const f=document.getElementById(setup?'aName':'lId');if(f)f.focus();},60);};
 const ssOrigLogin=submitLogin;
