@@ -15,5 +15,5 @@ setTimeout(()=>{const sp=document.getElementById('ssSplash');if(!sp)return;sp.in
  const w=(k,v)=>{try{const s=idb.transaction('kv','readwrite').objectStore('kv');v===undefined?s.delete(k):s.put(v,k);}catch(e){}};
  window.SSLS={getItem:k=>(k in mem?mem[k]:null),setItem:(k,v)=>{mem[k]=String(v);w(k,mem[k]);},removeItem:k=>{delete mem[k];w(k);},clear:()=>{Object.keys(mem).forEach(k=>{delete mem[k];w(k);});}};
  window.SALE_PREFIX=(()=>{try{return JSON.parse(mem.ss_dev||'null')||undefined}catch(e){}})();
- await Promise.all(['i18n.js','app.js','bridge.js','sync.js','approvals.js'].map(s=>new Promise((ok,no)=>{const e=document.createElement('script');e.src=s;e.async=false;e.onload=ok;e.onerror=()=>no(new Error('Could not load '+s));document.body.append(e);})));   // all four download at once, run in order
+ await Promise.all(['i18n.js','app.js','bridge.js','sync.js','approvals.js','legal.js'].map(s=>new Promise((ok,no)=>{const e=document.createElement('script');e.src=s;e.async=false;e.onload=ok;e.onerror=()=>no(new Error('Could not load '+s));document.body.append(e);})));   // all four download at once, run in order
 })().catch(e=>{const sp=document.getElementById('ssSplash');if(sp)sp.remove();document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">The app could not start: '+e.message+'. Refresh the page.</p>');});
