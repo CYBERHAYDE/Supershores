@@ -414,3 +414,36 @@ AP.renderToday = () => {
 })();
 { const _ra2 = renderAll; renderAll = function () { _ra2(); AP.renderToday(); }; }
 { const _cs2 = completeSale; completeSale = function () { _cs2(); AP.renderToday(); }; }
+/* ---------- 10. Print the inventory list (follows the search, category and branch filters) ---------- */
+AP.printInventory = mode => {
+  const q = (document.getElementById('invSearch').value || '').toLowerCase(), br = document.getElementById('invBranch').value, cat = document.getElementById('invCategory').value;
+  const list = items.filter(i => (!cat || i.category === cat) && (!br || i.branch === br) && (String(i.name).toLowerCase().includes(q) || String(i.category).toLowerCase().includes(q) || String(i.barcode || '').includes(q)))
+    .slice().sort((a, b) => String(a.category || '').localeCompare(String(b.category || '')) || String(a.name).localeCompare(String(b.name)));
+  if (!list.length) return alert('Nothing to print. No items match the current search or filters.');
+  const admin = role() === 'admin', count = mode === 'count';
+  const withCost = admin && !count && confirm('Include cost price and stock value on this printout?\n\nOK = include.  Cancel = leave them out (safer if the paper will be shared).');
+  const stockOf = i => i.service ? null : (i.bundle ? bundleAvailableStock(i) : i.stock);
+  const anyExpiry = list.some(i => i.expiry);
+  const heads = ['#', 'Item', 'Category', 'Branch', 'Stock'].concat(count ? ['Counted', 'Difference'] : ['Reorder at']).concat(['Price']).concat(withCost ? ['Cost', 'Stock value (cost)'] : []).concat(anyExpiry && !count ? ['Expiry'] : []).concat(count ? [] : ['Status']);
+  let valCost = 0, valSell = 0, low = 0;
+  const rows = list.map((i, n) => {
+    const st = stockOf(i), isLow = st !== null && st <= i.reorder; if (isLow) low++;
+    if (st !== null && st > 0) { valSell += st * i.price; valCost += st * (+i.cost || 0); }
+    return [n + 1, esc(i.name) + (i.unit && i.unit !== 'piece' ? ` <small>(${esc(i.unit)})</small>` : ''), esc(i.category || ''), esc(i.branch || ''), st === null ? '—' : st]
+      .concat(count ? ['________', '________'] : [i.service ? '—' : i.reorder]).concat([naira(i.price)])
+      .concat(withCost ? [naira(+i.cost || 0), st === null ? '—' : naira(Math.max(0, st) * (+i.cost || 0))] : [])
+      .concat(anyExpiry && !count ? [esc(i.expiry || '')] : []).concat(count ? [] : [i.service ? 'Service' : isLow ? 'LOW' : 'OK']);
+  });
+  const filt = [cat, br, q && `"${q}"`].filter(Boolean).map(esc).join(' · ');
+  const foot = count ? 'Count each item on the shelf, write the number under Counted, then enter any difference as a stock adjustment.'
+    : `${list.length} item${list.length === 1 ? '' : 's'}, ${low} at or below reorder level.` + (withCost ? ` Stock value at cost ${naira(valCost)}, at selling price ${naira(valSell)}.` : '');
+  showPrintableReport(count ? 'Stock count sheet' : 'Inventory list', `${esc(AP.fmtDate(todayIso()))}${filt ? ' · ' + filt : ' · All items'}`, heads, rows, foot);
+  logActivity(count ? 'Printed stock count sheet' : 'Printed inventory list');
+};
+(function () {
+  const bar = document.querySelector('#view-inventory .searchbar'); if (!bar || document.getElementById('invPrintBtn')) return;
+  const add = bar.querySelector('.btn.gold');
+  const b1 = document.createElement('button'); b1.className = 'btn ghost'; b1.id = 'invPrintBtn'; b1.textContent = '🖨 Print'; b1.onclick = () => AP.printInventory('list');
+  const b2 = document.createElement('button'); b2.className = 'btn ghost'; b2.id = 'invCountBtn'; b2.textContent = '📋 Count sheet'; b2.onclick = () => AP.printInventory('count');
+  bar.insertBefore(b1, add); bar.insertBefore(b2, add);
+})();
