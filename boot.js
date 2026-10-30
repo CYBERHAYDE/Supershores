@@ -6,8 +6,8 @@ addEventListener('unhandledrejection',e=>{window.__ssErr.push(String((e.reason&&
 setTimeout(()=>{const sp=document.getElementById('ssSplash');if(!sp)return;sp.innerHTML='';const box=document.createElement('div');box.style.cssText='font-family:sans-serif;padding:24px;text-align:center;max-width:420px';
  const h=document.createElement('h3');h.textContent='The app is taking too long to start';const p=document.createElement('p');p.style.cssText='font-size:14px;color:#444;word-break:break-word';
  p.textContent=window.__ssErr.length?'Problem found: '+window.__ssErr.slice(-2).join(' | '):'It may still be loading. Wait a little, or tap the button.';
- const bt=document.createElement('button');bt.textContent='Sign out and reload';bt.style.cssText='padding:10px 16px;font-size:15px';bt.onclick=()=>{try{sessionStorage.clear();}catch(e){}location.reload();};
- box.append(h,p,bt);sp.append(box);},8000);
+ const bt=document.createElement('button');bt.textContent='Reload';bt.style.cssText='padding:10px 16px;font-size:15px';bt.onclick=()=>{location.reload();};
+ box.append(h,p,bt);sp.append(box);},30000);
 (async()=>{
  const idb=await new Promise((ok,no)=>{const r=indexedDB.open((window.SS_BUILDER=/[?&]builder\b/.test(location.search))?'supershores-builder':'supershores-app',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});
  const mem={};
