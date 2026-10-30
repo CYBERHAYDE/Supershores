@@ -1269,7 +1269,7 @@ function submitNewDebtor(){
 }
 function renderDebtors(){
   const q = (document.getElementById('debtorSearch')?.value||'').toLowerCase();
-  const rows = debtors.filter(d=>String(d.name).toLowerCase().includes(q));
+  const rows = debtors.filter(d=>String(d.name).toLowerCase().includes(q)).filter(d=>!(d.balance<=0 && d.history && d.history.length>0));
   document.getElementById('debtorsBody').innerHTML = rows.map(d=>`
     <tr><td class="mono">${esc(d.id)}</td><td>${esc(d.name)}</td><td>${esc(d.phone||'—')}</td>
     <td class="mono" style="color:${d.balance>0?'var(--stamp)':'var(--sage)'};">${naira(d.balance)}</td>
