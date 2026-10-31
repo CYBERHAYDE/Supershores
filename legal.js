@@ -6,21 +6,106 @@ const LG = window.LG = {
     provider: 'CyberHayde',               // the company that builds and runs the app
     providerEmail: 'umohambrose970@gmail.com',                    // FILL IN: where privacy, deletion and refund requests go
     providerWhatsApp: '2348127784713',                 // FILL IN: digits only with country code, e.g. 2348012345678
-    updated: '30 October 2026',
+    updated: '31 October 2026',
     replyDays: 14,                        // how many days you promise to reply to a request
     refundDays: 14,                       // days to ask for a refund of a duplicate or wrong payment
     priceNoticeDays: 30,                  // how many days of warning you give before a price increase
-    policyVersion: '2026-10-30',          // CHANGE THIS whenever you change a policy. Everyone is asked to agree again
+    policyVersion: '2026-10-31',          // CHANGE THIS whenever you change a policy. Everyone is asked to agree again
     whatsNew: []                          // plain-English bullets shown as "What changed" when the version changes, e.g. ['Pricing: 30 days notice for increases']
   }
 };
 LG.biz = () => esc(settings.name || 'the business');
 LG.lic = () => { try { return ssGet('ss_lic', {}) || {}; } catch (e) { return {}; } };
 
+/* ---------- Pop-up look: one clean layout for every policy page and the agreement box ---------- */
+(function () {
+  const st = document.createElement('style');
+  st.textContent = `
+body.lgm-open{overflow:hidden}
+.lgm{position:fixed;inset:0;z-index:10020;background:rgba(15,25,45,.72);display:flex;align-items:center;justify-content:center;padding:16px;animation:lgmFade .18s ease}
+.lgm *{box-sizing:border-box}
+.lgm button{font-family:inherit}
+.lgm-card{background:#fff;color:#1d2a44;width:100%;max-width:640px;max-height:92vh;max-height:92dvh;display:flex;flex-direction:column;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;animation:lgmUp .22s ease;text-align:left}
+.lgm-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #e6eaf2;flex:0 0 auto}
+.lgm-head h3{margin:0;font-size:18px;line-height:1.3;color:#12306b}
+.lgm-x{flex:0 0 40px;width:40px;height:40px;border:0;border-radius:10px;background:#eef2f9;color:#1d2a44;font-size:24px;line-height:1;cursor:pointer;padding:0}
+.lgm-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:16px 18px 22px;font-size:15px;line-height:1.6;counter-reset:lgs}
+.lgm-body>*:first-child{margin-top:0}
+.lgm-body p{margin:8px 0}
+.lgm-body small{color:#5b6882}
+.lgm-body a{color:#1a4fa3;text-decoration:underline;text-underline-offset:2px;word-break:break-word}
+.lgm-body ul{margin:8px 0;padding-left:22px;list-style:disc}
+.lgm-body li{margin:6px 0}
+.lgm-body h4{margin:22px 0 6px;font-size:15.5px;line-height:1.35;color:#12306b}
+.lgm-num h4{counter-increment:lgs}
+.lgm-num h4::before{content:counter(lgs) ". ";color:#a47d00}
+.lgm-meta{display:inline-block;font-size:12px;line-height:1.4;background:#eef2f9;color:#43506b;border-radius:10px;padding:4px 10px;margin:0 0 12px}
+.lgm-sum{background:#f4f8ff;border:1px solid #d9e5fa;border-radius:12px;padding:4px 14px;margin:6px 0 4px}
+.lgm-sum>div{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #e3ecfb;font-size:14.5px}
+.lgm-sum>div:last-child{border-bottom:0}
+.lgm-sum .i{flex:0 0 26px;text-align:center;font-size:18px;line-height:1.4}
+.lgm-body .ap-req{background:#f6f8fc;border:1px solid #e2e7f1;border-radius:12px;padding:12px 14px;margin:10px 0}
+.lgm-body details{border:1px solid #e2e7f1;border-radius:12px;margin:8px 0;background:#fff}
+.lgm-body summary{padding:12px 14px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.lgm-body summary::-webkit-details-marker{display:none}
+.lgm-body summary::after{content:"+";font-size:20px;color:#5b6882;line-height:1}
+.lgm-body details[open] summary::after{content:"\\2212"}
+.lgm-body details[open] summary{border-bottom:1px solid #e2e7f1}
+.lgm-body details>p,.lgm-body details>ul{margin:10px 14px}
+.lgm-body label{display:block;font-weight:600;font-size:14px;margin:12px 0 4px}
+.lgm-body input[type=text],.lgm-body select,.lgm-body textarea{display:block;width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1.5px solid #cdd5e4;border-radius:10px;background:#fff;color:inherit;margin:0}
+.lgm input[type=checkbox],.lgm input[type=radio]{width:20px;height:20px;flex:0 0 20px;margin:0;padding:0;accent-color:#c9a227}
+.lgm-body .lgm-check{display:flex;gap:10px;align-items:flex-start;font-weight:400;margin:14px 0}
+.lgm-body .form-row{margin:0}
+.lgm-body .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.lgm-body .row .btn{flex:1 1 180px;min-height:46px;margin:0}
+.lgm-choices{display:grid;gap:8px;width:100%;margin:0}
+.lgm .lgm-choice{display:flex;gap:12px;align-items:center;min-height:50px;padding:10px 14px;border:1.5px solid #cdd5e4;border-radius:12px;cursor:pointer;font-weight:500;font-size:15px;margin:0;background:#fff}
+.lgm .lgm-choice:has(input:checked){border-color:#1a4fa3;background:#eef4ff}
+.lgm-linkrow{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.lgm-body .lgm-linkrow a{flex:1 1 150px;text-align:center;text-decoration:none;padding:10px 12px;border:1.5px solid #cdd5e4;border-radius:10px;font-size:14px;font-weight:600;color:#12306b;background:#fff}
+.lgm-new{background:#fff7dc;border:1px solid #ecd68a;border-radius:12px;padding:10px 14px;margin:0 0 12px}
+.lgm-new ul{margin:6px 0 0}
+.lgm-foot{flex:0 0 auto;display:flex;gap:10px;flex-wrap:wrap;padding:12px 18px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid #e6eaf2;background:#fff}
+.lgm-foot .btn{flex:1 1 140px;min-height:46px;margin:0;width:auto}
+.lgm-foot.col{flex-direction:column;align-items:stretch}
+.lgm-foot.col .btn{flex:0 0 auto;width:100%}
+@media (max-width:560px){.lgm{align-items:flex-end;padding:0}.lgm-card{max-width:none;border-radius:18px 18px 0 0;max-height:94vh;max-height:94dvh}.lgm-head{padding:12px 16px}.lgm-body{padding:14px 16px 20px}.lgm-foot{padding-left:16px;padding-right:16px}}
+@media (max-height:720px){.lgm .lgm-choice{min-height:42px;padding:6px 12px}.lgm-foot{padding-top:8px;gap:6px}.lgm-foot .btn{min-height:42px}.lgm-sum>div{padding:6px 0}.lgm-head{padding-top:10px;padding-bottom:10px}}
+@media (max-height:520px){.lgm{align-items:stretch;padding:0}.lgm-card{max-height:100vh;max-height:100dvh;border-radius:0;max-width:none}}
+@keyframes lgmFade{from{opacity:0}to{opacity:1}}
+@keyframes lgmUp{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.lgm,.lgm-card{animation:none}}`;
+  document.head.append(st);
+})();
+LG.modal = o => {
+  const old = document.getElementById(o.id); if (old) old.remove();
+  const d = document.createElement('div'); d.className = 'lgm'; d.id = o.id; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', o.title);
+  d.innerHTML = `<div class="lgm-card"><div class="lgm-head"><h3>${esc(o.title)}</h3>${o.closable === false ? '' : `<button class="lgm-x" aria-label="Close" onclick="LG.close('${o.id}')">&times;</button>`}</div>
+    <div class="lgm-body${o.numbered ? ' lgm-num' : ''}">${o.body}</div>${o.foot ? `<div class="lgm-foot${o.footCol ? ' col' : ''}">${o.foot}</div>` : ''}</div>`;
+  if (o.closable !== false) d.addEventListener('click', e => { if (e.target === d) LG.close(o.id); });
+  document.body.append(d); document.body.classList.add('lgm-open');
+  return d;
+};
+LG.close = id => { const e = document.getElementById(id); if (e) e.remove(); if (!document.querySelector('.lgm')) document.body.classList.remove('lgm-open'); };
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const all = [...document.querySelectorAll('.lgm')], top = all[all.length - 1];
+  if (top && top.querySelector('.lgm-x')) { e.stopPropagation(); LG.close(top.id); }
+}, true);
+LG.numbered = ['privacy', 'terms', 'refund', 'cookies', 'pricing'];
+
+
 /* ---------- pages ---------- */
 LG.pages = {
   privacy: () => ({ title: 'Privacy Policy', html: `
-    <p><small>Last updated: ${LG.CONFIG.updated}. Governed by the Nigeria Data Protection Act 2023.</small></p>
+    <span class="lgm-meta">Last updated ${LG.CONFIG.updated} &middot; Nigeria Data Protection Act 2023</span>
+    <div class="lgm-sum">
+      <div><span class="i">📋</span><span><b>What we record:</b> your name, ID, role, sales and what you do in the app. Credit customers: name and phone.</span></div>
+      <div><span class="i">🔒</span><span><b>Where it lives:</b> the business's Google Sheet and your phone (for offline use). No cookies, no ads, and we do not sell it.</span></div>
+      <div><span class="i">✋</span><span><b>Your rights:</b> see, correct or delete your data at any time.</span></div>
+      <div><span class="i">📨</span><span><b>Questions:</b> ${LG.contactLine()}</span></div>
+    </div>
     <h4>Who is responsible for your data</h4>
     <p><b>${LG.biz()}</b> ${settings.address ? '(' + esc(settings.address) + ')' : ''} is the business that decides what is recorded in this app, so it is the data controller. <b>${esc(LG.CONFIG.provider)}</b> builds and runs the app for the business and handles the data only on the business's behalf.</p>
     <h4>What is recorded</h4>
@@ -46,20 +131,20 @@ LG.pages = {
     <h4>Changes and contact</h4><p>If this policy changes, the new date shows above. Questions: ${LG.contactLine()}</p>` }),
 
   terms: () => ({ title: 'Terms of Service', html: `
-    <p><small>Last updated: ${LG.CONFIG.updated}.</small></p>
-    <h4>1. The service</h4><p>${esc(LG.CONFIG.provider)} provides this inventory and sales app to ${LG.biz()} (“the business”) on a subscription basis. By signing in you agree to these terms.</p>
-    <h4>2. Accounts</h4><p>Each person uses their own staff ID and password and is responsible for what is done with them. The first admin manages the other accounts. Tell the first admin straight away if a password is lost or shared.</p>
-    <h4>3. Acceptable use</h4><p>Use the app only for the business's lawful trading. Do not try to get around roles, prices or locks, access data you are not allowed to see, or interfere with the service.</p>
-    <h4>4. Subscription and fees</h4><p>The plan price, the length of each period and how to pay are shown under <a href="#" onclick="LG.open('pricing');return false">Pricing and fees</a>. Payment is by bank transfer, then uploading the receipt. Nothing renews or is charged automatically. The price may change as running costs change, with ${LG.CONFIG.priceNoticeDays} days' notice and never during a period you have already paid for.</p>
-    <h4>5. Expiry and suspension</h4><p>When a subscription runs out (after any grace days) or is suspended, staff are locked out and the owner can still sign in to pay. Data is not deleted because of non-payment.</p>
-    <h4>6. Your data</h4><p>The business owns its business data. ${esc(LG.CONFIG.provider)} uses it only to run the service. See the Privacy Policy.</p>
-    <h4>7. Accuracy and limits</h4><p>Reports, stock counts and profit projections are calculated from what staff enter and from estimates, so they are only as correct as that information. Offline work saves on the phone and reaches the server when the phone reconnects. Approvals, staff management and payments need internet. We aim to keep the service running but cannot promise it will never be interrupted.</p>
-    <h4>8. Liability</h4><p>To the extent the law allows, ${esc(LG.CONFIG.provider)} is not liable for indirect losses such as lost profit, or for losses caused by wrong entries, lost or unlocked devices, or shared passwords. Nothing here limits rights you have under Nigerian law that cannot be limited.</p>
-    <h4>9. Ending the service</h4><p>The business can stop at any time (see <a href="#" onclick="LG.open('unsub');return false">Unsubscribe</a>). We may suspend an account that breaks these terms.</p>
-    <h4>10. Law and contact</h4><p>These terms are governed by the laws of the Federal Republic of Nigeria. ${LG.contactLine()}</p>` }),
+    <span class="lgm-meta">Last updated ${LG.CONFIG.updated}</span>
+    <h4>The service</h4><p>${esc(LG.CONFIG.provider)} provides this inventory and sales app to ${LG.biz()} (“the business”) on a subscription basis. By signing in you agree to these terms.</p>
+    <h4>Accounts</h4><p>Each person uses their own staff ID and password and is responsible for what is done with them. The first admin manages the other accounts. Tell the first admin straight away if a password is lost or shared.</p>
+    <h4>Acceptable use</h4><p>Use the app only for the business's lawful trading. Do not try to get around roles, prices or locks, access data you are not allowed to see, or interfere with the service.</p>
+    <h4>Subscription and fees</h4><p>The plan price, the length of each period and how to pay are shown under <a href="#" onclick="LG.open('pricing');return false">Pricing and fees</a>. Payment is by bank transfer, then uploading the receipt. Nothing renews or is charged automatically. The price may change as running costs change, with ${LG.CONFIG.priceNoticeDays} days' notice and never during a period you have already paid for.</p>
+    <h4>Expiry and suspension</h4><p>When a subscription runs out (after any grace days) or is suspended, staff are locked out and the owner can still sign in to pay. Data is not deleted because of non-payment.</p>
+    <h4>Your data</h4><p>The business owns its business data. ${esc(LG.CONFIG.provider)} uses it only to run the service. See the Privacy Policy.</p>
+    <h4>Accuracy and limits</h4><p>Reports, stock counts and profit projections are calculated from what staff enter and from estimates, so they are only as correct as that information. Offline work saves on the phone and reaches the server when the phone reconnects. Approvals, staff management and payments need internet. We aim to keep the service running but cannot promise it will never be interrupted.</p>
+    <h4>Liability</h4><p>To the extent the law allows, ${esc(LG.CONFIG.provider)} is not liable for indirect losses such as lost profit, or for losses caused by wrong entries, lost or unlocked devices, or shared passwords. Nothing here limits rights you have under Nigerian law that cannot be limited.</p>
+    <h4>Ending the service</h4><p>The business can stop at any time (see <a href="#" onclick="LG.open('unsub');return false">Unsubscribe</a>). We may suspend an account that breaks these terms.</p>
+    <h4>Law and contact</h4><p>These terms are governed by the laws of the Federal Republic of Nigeria. ${LG.contactLine()}</p>` }),
 
   refund: () => ({ title: 'Refund Policy', html: `
-    <p><small>Last updated: ${LG.CONFIG.updated}.</small></p>
+    <span class="lgm-meta">Last updated ${LG.CONFIG.updated}</span>
     <h4>Subscription payments</h4>
     <ul><li>If you pay twice by mistake, or pay the wrong amount, ask within ${LG.CONFIG.refundDays} days and the extra amount is refunded in full to the account it came from.</li>
     <li>If the service could not be used because of a fault on our side, ask for time to be added back or for a refund of the affected days.</li>
@@ -69,7 +154,7 @@ LG.pages = {
     <h4>Refunds to the business's own customers</h4><p>Refunds on shop sales are decided by ${LG.biz()}, not by ${esc(LG.CONFIG.provider)}. An admin records them in the Sales log, which puts the items back in stock.</p>` }),
 
   cookies: () => ({ title: 'Cookies and storage', html: `
-    <p><small>Last updated: ${LG.CONFIG.updated}.</small></p>
+    <span class="lgm-meta">Last updated ${LG.CONFIG.updated}</span>
     <p>This app does <b>not</b> use cookies. It does not use advertising, tracking or analytics tools.</p>
     <h4>What it stores on your phone instead</h4>
     <ul><li><b>Browser storage:</b> a copy of products, sales, expenses, customers and settings, your sign-in session, and changes waiting to sync. This is what lets the app work offline.</li>
@@ -79,7 +164,7 @@ LG.pages = {
 
   pricing: () => { const L = LG.lic(), price = +L.price || 0;
     return { title: 'Pricing and fees', html: `
-    <p><small>Shown live from the business's subscription settings.</small></p>
+    <span class="lgm-meta">Shown live from the business's subscription settings</span>
     ${price > 0 ? `<div class="ap-req"><b>${naira(price)}</b> for every ${+L.periodDays || 30} days<br><small>${L.expiry ? 'Currently paid up to ' + esc(AP.fmtDate(L.expiry)) : ''}</small></div>` : '<div class="ap-req">The plan price has not been set yet. Ask us before paying anything.</div>'}
     <h4>What you pay</h4>
     <ul><li>The plan price above, once per period, and nothing else from us.</li>
@@ -111,9 +196,9 @@ LG.pages = {
       <option>My staff account and activity</option><option>A customer's details (debtor record)</option>
       <option>All of this business's data</option><option>Something else (explain below)</option></select></div>
     <div class="form-row"><label>Details</label><textarea id="lgDet" rows="3"></textarea></div>
-    <label style="display:flex;gap:6px;font-size:13px"><input id="lgBk" type="checkbox"> Also delete backup copies that contain it</label>
+    <label class="lgm-check"><input id="lgBk" type="checkbox"><span>Also delete backup copies that contain it</span></label>
     <p class="helptext">Some records may have to be kept for a time where the law requires it (for example sales and tax records). We will tell you if that applies. The first admin can also wipe the business's inventory data from Settings.</p>
-    <div class="row"><button class="btn gold" onclick="LG.sendDelete()">Send request</button></div>` }),
+    ` , foot: `<button class="btn ghost" onclick="LG.close('lgPage')">Cancel</button><button class="btn gold" onclick="LG.sendDelete()">Send request</button>` }),
 
   unsub: () => ({ title: 'Unsubscribe', html: `
     <p>We do not send marketing emails or texts from this app. Renewal reminders appear only inside the app.</p>
@@ -134,14 +219,15 @@ LG.contactLine = () => {
 LG.open = key => {
   const p = LG.pages[key]; if (!p) return;
   const x = p();
-  ssOverlay(`<div style="max-height:78vh;overflow:auto;text-align:left;font-size:14px;line-height:1.5"><h3 style="margin-top:0">${esc(x.title)}</h3>${x.html}</div><div class="row" style="margin-top:10px"><button class="btn ghost" onclick="ssClose()">Close</button></div>`, true);
+  LG.modal({ id: 'lgPage', title: x.title, body: x.html, numbered: LG.numbered.includes(key), foot: x.foot || `<button class="btn gold" onclick="LG.close('lgPage')">Close</button>` });
 };
 LG.send = (subject, body) => {
   const c = LG.CONFIG, text = `${subject}\n\n${body}\n\nBusiness: ${settings.name || ''}`;
   logActivity(`${subject} sent`);
   if (c.providerWhatsApp) { window.open(`https://wa.me/${c.providerWhatsApp}?text=${encodeURIComponent(text)}`, '_blank'); return; }
   if (c.providerEmail) { location.href = `mailto:${c.providerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\nBusiness: ' + (settings.name || ''))}`; return; }
-  ssOverlay(`<h3 style="margin-top:0">Copy this and send it</h3><p class="helptext">No contact address is set up in this app yet. Copy the message and send it to ${LG.contactLine()}.</p><textarea id="lgCopy" rows="7" style="width:100%">${esc(text)}</textarea><div class="row"><button class="btn gold" onclick="document.getElementById('lgCopy').select();document.execCommand('copy');AP.toast('Copied.')">Copy</button><button class="btn ghost" onclick="ssClose()">Close</button></div>`, true);
+  LG.modal({ id: 'lgCopyBox', title: 'Copy this and send it', body: `<p>No contact address is set up in this app yet. Copy the message and send it to ${LG.contactLine()}.</p><textarea id="lgCopy" rows="8">${esc(text)}</textarea>`,
+    foot: `<button class="btn ghost" onclick="LG.close('lgCopyBox')">Close</button><button class="btn gold" onclick="document.getElementById('lgCopy').select();document.execCommand('copy');AP.toast('Copied.')">Copy</button>` });
 };
 LG.sendDelete = () => {
   const g = id => (document.getElementById(id) || {}).value || '';
@@ -163,35 +249,33 @@ LG.linksHtml = () => `<div class="lglinks" style="text-align:center;font-size:12
 LG.consentKey = 'ss_consent';
 LG.accepted = () => { const m = ssGet(LG.consentKey, {}), r = currentUser && m[currentUser.id]; return !!(r && r.v === LG.CONFIG.policyVersion); };
 LG.sub = key => {                                  // opens a full policy on top of the agreement box without closing it
-  const x = LG.pages[key](), old = document.getElementById('lgSub'); if (old) old.remove();
-  const d = document.createElement('div'); d.className = 'ssov'; d.id = 'lgSub';
-  d.innerHTML = `<div class="sscard" style="max-height:85vh;overflow:auto;text-align:left;font-size:14px;line-height:1.5"><h3 style="margin-top:0">${esc(x.title)}</h3>${x.html}<div class="row" style="margin-top:10px"><button class="btn ghost" onclick="document.getElementById('lgSub').remove()">Back</button></div></div>`;
-  document.body.append(d);
+  const x = LG.pages[key]();
+  LG.modal({ id: 'lgSub', title: x.title, body: x.html, numbered: LG.numbered.includes(key), foot: `<button class="btn gold" onclick="LG.close('lgSub')">Back</button>` });
 };
 LG.showConsent = () => {
   const had = !!ssGet(LG.consentKey, {})[currentUser.id], news = LG.CONFIG.whatsNew || [], c = LG.CONFIG;
-  const d = document.createElement('div'); d.className = 'ssov'; d.id = 'lgConsent';
-  d.innerHTML = `<div class="sscard" style="max-height:90vh;overflow:auto;text-align:left;font-size:14px;line-height:1.5">
-    <h3 style="margin-top:0">${had ? 'Our policies have been updated' : 'Before you continue'}</h3>
-    ${had && news.length ? `<div class="ap-req"><b>What changed</b><ul style="margin:6px 0 0 18px">${news.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
-    <p>${LG.biz()} uses this app to run the shop. In short:</p>
-    <ul style="margin:0 0 8px 18px">
-      <li>We record your name, ID, role, sales and what you do in the app. Customers on credit are kept with name and phone number.</li>
-      <li>It is stored in the business's Google Sheet and on your phone so the app works offline. No cookies, no ads, and we do not sell your data.</li>
-      <li>You can ask to see, correct or delete your data at any time (Delete my data, at the bottom of the app).</li>
-      <li>The subscription price can change as running costs change, with ${c.priceNoticeDays} days' notice and never during a period already paid for.</li>
-    </ul>
-    <p style="font-size:13px">Read in full: ${['privacy:Privacy Policy', 'terms:Terms of Service', 'refund:Refund Policy', 'cookies:Cookies', 'pricing:Pricing and fees'].map(x => { const k = x.split(':'); return `<a href="#" onclick="LG.sub('${k[0]}');return false">${k[1]}</a>`; }).join(' · ')}</p>
-    <label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0"><input type="radio" name="lgc" value="agree" onchange="document.getElementById('lgcGo').disabled=false"><span>I have read these and I <b>agree</b></span></label>
-    <label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0"><input type="radio" name="lgc" value="disagree" onchange="document.getElementById('lgcGo').disabled=false"><span>I <b>do not agree</b></span></label>
-    <div class="errtext" id="lgcMsg"></div>
-    <button class="btn gold" id="lgcGo" style="width:100%;margin-top:8px" disabled onclick="LG.decide()">Continue</button></div>`;
-  document.body.append(d);
+  LG.modal({ id: 'lgConsent', closable: false, title: had ? 'Our policies have been updated' : 'Before you continue',
+    body: `${had && news.length ? `<div class="lgm-new"><b>What changed</b><ul>${news.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
+      <p>${LG.biz()} uses this app to run the shop. In short:</p>
+      <div class="lgm-sum">
+        <div><span class="i">📋</span><span><b>What we record:</b> your name, ID, role, sales and what you do in the app. Credit customers: name and phone number.</span></div>
+        <div><span class="i">🔒</span><span><b>Where it lives:</b> the business's Google Sheet and your phone, so the app works offline. No cookies, no ads, and we do not sell your data.</span></div>
+        <div><span class="i">✋</span><span><b>Your rights:</b> ask to see, correct or delete your data at any time (Delete my data, at the bottom of the app).</span></div>
+        <div><span class="i">💳</span><span><b>Pricing:</b> the subscription price can change as running costs change, with ${c.priceNoticeDays} days' notice and never during a period already paid for.</span></div>
+      </div>
+      <p style="margin:14px 0 0"><b>Read in full</b></p>
+      <div class="lgm-linkrow">${[['privacy', 'Privacy Policy'], ['terms', 'Terms of Service'], ['refund', 'Refund Policy'], ['cookies', 'Cookies'], ['pricing', 'Pricing and fees']].map(k => `<a href="#" onclick="LG.sub('${k[0]}');return false">${k[1]}</a>`).join('')}</div>`,
+    footCol: true,
+    foot: `<div class="lgm-choices" role="radiogroup" aria-label="Your choice">
+          <label class="lgm-choice"><input type="radio" name="lgc" value="agree" onchange="document.getElementById('lgcGo').disabled=false"><span>I have read these and I <b>agree</b></span></label>
+          <label class="lgm-choice"><input type="radio" name="lgc" value="disagree" onchange="document.getElementById('lgcGo').disabled=false"><span>I <b>do not agree</b></span></label>
+        </div>
+      <button class="btn gold" id="lgcGo" disabled onclick="LG.decide()">Continue</button>` });
 };
 LG.decide = () => {
   const pick = document.querySelector('input[name="lgc"]:checked'); if (!pick) return;
   const v = LG.CONFIG.policyVersion;
-  ['lgSub', 'lgConsent'].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); });
+  ['lgSub', 'lgConsent'].forEach(id => LG.close(id));
   if (pick.value === 'agree') {
     const m = ssGet(LG.consentKey, {}); m[currentUser.id] = { v: v, t: new Date().toISOString() }; ssSet(LG.consentKey, m);
     logActivity(`Accepted policies (version ${v})`);
