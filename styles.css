@@ -239,3 +239,8 @@
     .editcell{ width:100%; }
     .editrow-actions{ padding-bottom:10px; }
   }
+/* Small phones: three cards in a row do not fit, so use two */
+@media (max-width:480px){
+  #reportCards, #closeCards, #futureEstimateCards{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+  .card{ min-width:0; }
+}
