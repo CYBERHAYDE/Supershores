@@ -237,7 +237,7 @@ LG.sendDelete = () => {
 LG.sendUnsub = kind => LG.send(kind === 'cancel' ? 'Cancel subscription request' : 'Unsubscribe from messages',
   `Name: ${(currentUser && currentUser.name) || ''}\nID: ${(currentUser && currentUser.id) || ''}\nDate: ${AP.fmtDate(todayIso())}`);
 LG.links = [['privacy', 'Privacy'], ['terms', 'Terms'], ['refund', 'Refunds'], ['cookies', 'Cookies'], ['pricing', 'Pricing and fees'], ['help', 'Help'], ['delete', 'Delete my data'], ['unsub', 'Unsubscribe']];
-LG.linksHtml = () => `<div class="lglinks" style="text-align:center;font-size:12px;margin:10px 0;line-height:2">${LG.links.map(l => `<a href="#" onclick="LG.open('${l[0]}');return false" style="margin:0 7px;white-space:nowrap">${l[1]}</a>`).join('')}</div>`;
+LG.linksHtml = () => `<div class="lglinks" style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px 16px;padding:0 12px;margin:10px 0;font-size:12px;line-height:1.9;max-width:100%;box-sizing:border-box">${LG.links.map(l => `<a href="#" onclick="LG.open('${l[0]}');return false" style="white-space:nowrap;padding:2px 0">${l[1]}</a>`).join('')}</div>`;
 (function () {
   const holder = document.createElement('div'); holder.id = 'legalLinks'; holder.innerHTML = LG.linksHtml();
   const foot = document.querySelector('footer.pitch');
