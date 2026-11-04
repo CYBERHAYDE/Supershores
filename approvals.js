@@ -397,6 +397,7 @@ AP.refreshView = async () => {
 { const _ra = renderAll; renderAll = function () { _ra(); AP.renderView(); }; }
 { const _arl = applyRoleLocks; applyRoleLocks = function () { _arl(); AP.badge(AP.pending.length, !!(currentUser && currentUser.role === 'admin')); }; }
 
+
 /* ---------- 9. Today's sales inside the Register Sale window (everyone) ---------- */
 AP.renderToday = () => {
   const box = document.getElementById('todaySalesBody'); if (!box) return;
@@ -414,6 +415,8 @@ AP.renderToday = () => {
 })();
 { const _ra2 = renderAll; renderAll = function () { _ra2(); AP.renderToday(); }; }
 { const _cs2 = completeSale; completeSale = function () { _cs2(); AP.renderToday(); }; }
+
+
 /* ---------- 10. Print the inventory list (follows the search, category and branch filters) ---------- */
 AP.printInventory = mode => {
   const q = (document.getElementById('invSearch').value || '').toLowerCase(), br = document.getElementById('invBranch').value, cat = document.getElementById('invCategory').value;
@@ -447,3 +450,47 @@ AP.printInventory = mode => {
   const b2 = document.createElement('button'); b2.className = 'btn ghost'; b2.id = 'invCountBtn'; b2.textContent = '📋 Count sheet'; b2.onclick = () => AP.printInventory('count');
   bar.insertBefore(b1, add); bar.insertBefore(b2, add);
 })();
+
+
+/* ---------- 11. Admin only: record a sale for an earlier day ---------- */
+AP.BACK_DAYS = 90;
+AP.bdCfg = () => {
+  const on = document.getElementById('bdOn');
+  return { on: !!(on && on.checked && role() === 'admin'), date: (document.getElementById('bdDate') || {}).value || '', time: (document.getElementById('bdTime') || {}).value || '12:00', reason: ((document.getElementById('bdWhy') || {}).value || '').trim() };
+};
+AP.bdToggle = () => { const f = document.getElementById('bdFields'), on = document.getElementById('bdOn').checked; f.hidden = !on; if (on && !document.getElementById('bdDate').value) document.getElementById('bdDate').value = localIso(new Date(Date.now() - 864e5)); };
+AP.bdReset = () => { const o = document.getElementById('bdOn'); if (!o) return; o.checked = false; document.getElementById('bdFields').hidden = true; document.getElementById('bdWhy').value = ''; };
+AP.bdShow = () => { const b = document.getElementById('bdBox'); if (b) { b.hidden = role() !== 'admin'; if (b.hidden) AP.bdReset(); } };
+(function () {
+  const btn = document.getElementById('completeSaleBtn'); if (!btn || document.getElementById('bdBox')) return;
+  const box = document.createElement('div'); box.id = 'bdBox'; box.hidden = true; box.style.cssText = 'margin:10px 0;padding:10px 12px;border:1px dashed var(--paper-line,#cdd5e4);border-radius:10px';
+  box.innerHTML = `<label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px"><input type="checkbox" id="bdOn" style="width:auto;flex:0 0 18px" onchange="AP.bdToggle()"> <span>Record this sale for an earlier day <small style="color:var(--muted,#666)">(admin only)</small></span></label>
+    <div id="bdFields" hidden style="margin-top:8px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:13px">Date it was sold</label><input type="date" id="bdDate" min="${localIso(new Date(Date.now() - AP.BACK_DAYS * 864e5))}" max="${todayIso()}"></div><div><label style="font-size:13px">Time</label><input type="time" id="bdTime" value="12:00"></div></div>
+    <label style="font-size:13px;margin-top:8px;display:block">Why is it being added late?</label><input type="text" id="bdWhy" maxlength="120" placeholder="e.g. forgotten at the time of sale">
+    <p class="helptext" style="margin:6px 0 0">It will show on that day's reports and receipt. Stock is taken off now.</p></div>`;
+  btn.parentNode.insertBefore(box, btn);
+})();
+{
+  const _cs4 = completeSale;
+  completeSale = function () {
+    const b = AP.bdCfg(), today = todayIso(); let ts = null;
+    if (b.on && b.date && b.date !== today) {
+      if (b.date > today) return alert('The sale date cannot be in the future.');
+      if (b.date < localIso(new Date(Date.now() - AP.BACK_DAYS * 864e5))) return alert(`A sale can only be recorded up to ${AP.BACK_DAYS} days back.`);
+      if (b.reason.length < 3) return alert('Type a short reason for adding this sale late.');
+      ts = new Date(`${b.date}T${b.time || '12:00'}:00`); if (isNaN(ts)) return alert('Check the date and time.');
+    } else if (b.on && !b.date) return alert('Pick the date the sale really happened.');
+    const before = sales.length; _cs4();
+    if (ts && sales.length > before) {
+      const s = sales[sales.length - 1];
+      s.isoDate = b.date; s.date = ts.toLocaleDateString('en-NG', { weekday: 'short' }); s.time = ts.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
+      s.backdated = true; s.backTs = ts.toISOString(); s.backReason = b.reason;
+      persistSales();                                    // sync picks up the date and the reason from here
+      AP.bdReset(); lastSale = s; showReceipt(s); AP.renderToday && AP.renderToday();
+    }
+  };
+  const _fs = SY.fixSale; SY.fixSale = function (o, r) { _fs.call(SY, o, r); if (r && r.dayClosed) AP.toast('Sale saved for that day. That day was already closed, so its cash count may need rechecking.'); };
+  const _raB = renderAll; renderAll = function () { _raB(); AP.bdShow(); };
+  if (AP.rules) AP.rules.unshift([/^Sale backdated/i, 'Sale added for an earlier day', 'An admin recorded a sale that was missed at the time, and gave it the date it really happened. It counts in that day\'s reports.', 'Check the reason shown below. If that day was already closed, its cash count may need rechecking.']);
+}
+AP.bdShow();
