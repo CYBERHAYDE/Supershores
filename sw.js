@@ -1,4 +1,4 @@
-const C='ss2-v48',SHELL=['./','index.html','styles.css','i18n.js','app.js','boot.js','bridge.js','sync.js','approvals.js','legal.js','manifest.json','assets/logo.png','assets/icon-192.png','assets/icon-512.png'];
+const C='ss2-v49',SHELL=['./','index.html','styles.css','i18n.js','app.js','boot.js','bridge.js','sync.js','approvals.js','legal.js','manifest.json','assets/logo.png','assets/icon-192.png','assets/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL.map(u=>new Request(u,{cache:'reload'})))));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim();});
 // App files come straight from the saved set that was installed together, so the app starts fast and files from two versions never mix.
