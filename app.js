@@ -382,7 +382,7 @@ function applyRoleLocks(){
   const isStaff = role()==='staff';
   ['tabReports','tabActivity','tabCloseday','tabSettings','tabExpenses'].forEach(id=>document.getElementById(id).dataset.locked = isStaff?'1':'0');
   ['moreReports','moreActivity','moreCloseday','moreSettings','moreExpenses'].forEach(id=>document.getElementById(id).dataset.locked = isStaff?'1':'0');
-    const noExp = isStaff && !can('expenses');   ['tabExpenses','moreExpenses'].forEach(id=>document.getElementById(id).dataset.locked = noExp?'1':'0');   const sellTab=document.querySelector('#tabs [data-view="sale"]'); if(sellTab) sellTab.dataset.locked = can('sell')?'0':'1';   document.getElementById('tabDebtors').dataset.locked = can('debtors')?'0':'1';   document.getElementById('expensesLocked').style.display = noExp?'block':'none';
+    const noExp = isStaff && !can('expenses');   ['tabExpenses','moreExpenses'].forEach(id=>document.getElementById(id).dataset.locked = noExp?'1':'0');   const sellTab=document.querySelector('#tabs [data-view="sale"]'); if(sellTab) sellTab.dataset.locked = can('sell')?'0':'1';   document.getElementById('tabDebtors').dataset.locked = can('debtors')?'0':'1';   ['tabCredit','moreCredit'].forEach(id=>document.getElementById(id).dataset.locked = can('debtors')?'0':'1');   document.getElementById('expensesLocked').style.display = noExp?'block':'none';
   document.getElementById('expensesContent').style.display = noExp?'none':'block';
   document.getElementById('reportsLocked').style.display = isStaff?'block':'none';
   document.getElementById('reportsContent').style.display = isStaff?'none':'block';
@@ -396,7 +396,7 @@ function applyRoleLocks(){
   document.getElementById('staffCostNote').style.display = (isStaff && !can('items'))?'block':'none';
   document.getElementById('importBtn').style.display = isStaff?'none':'inline-flex';
   const activeTab = document.querySelector('nav.tabs button.active').dataset.view;
-    if(isStaff && (['reports','activity','closeday','settings'].includes(activeTab) || (activeTab==='expenses'&&!can('expenses')) || (activeTab==='sale'&&!can('sell')) || (activeTab==='debtors'&&!can('debtors')))) switchView('dashboard');
+    if(isStaff && (['reports','activity','closeday','settings'].includes(activeTab) || (activeTab==='expenses'&&!can('expenses')) || (activeTab==='sale'&&!can('sell')) || ((activeTab==='debtors'||activeTab==='credit')&&!can('debtors')))) switchView('dashboard');
 }
 
 /* ================= Dashboard ================= */
@@ -1289,6 +1289,51 @@ function recordPayment(id){
   renderDebtors();
 }
 
+/* ================= Credit sales (who owes what, paid or not) ================= */
+function creditSalesList(){
+  const key = n => String(n||'').toLowerCase().trim();
+  const paidPool = {};   // what each customer has paid so far, spread over their oldest credit sale first
+  debtors.forEach(d=>{ paidPool[key(d.name)] = (d.history||[]).filter(h=>h.type==='payment').reduce((a,h)=>a+(+h.amount||0),0); });
+  const list = sales.filter(s=>s.payment==='Credit').slice().sort((a,b)=> String(a.isoDate+(a.time||'')) < String(b.isoDate+(b.time||'')) ? -1 : 1);
+  return list.map(s=>{
+    const k = key(s.customer), total = +s.total||0;
+    if(s.refunded) return { sale:s, paid:0, owing:0, status:'Refunded' };
+    const take = Math.min(total, Math.max(0, paidPool[k]||0));
+    paidPool[k] = (paidPool[k]||0) - take;
+    const owing = Math.max(0, total - take);
+    return { sale:s, paid:take, owing, status: owing<=0 ? 'Paid' : take>0 ? 'Part paid' : 'Still on credit' };
+  });
+}
+function renderCredit(){
+  const body = document.getElementById('creditBody'); if(!body) return;
+  const q = (document.getElementById('creditSearch').value||'').toLowerCase();
+  const f = document.getElementById('creditFilter').value;
+  const all = creditSalesList();
+  const rows = all.filter(r=>{
+    if(f==='open' && !(r.status==='Still on credit'||r.status==='Part paid')) return false;
+    if(f==='paid' && r.status!=='Paid') return false;
+    if(!q) return true;
+    const items = (r.sale.lines||[]).map(l=>l.name).join(' ');
+    return String(r.sale.customer||'').toLowerCase().includes(q) || items.toLowerCase().includes(q);
+  });
+  const sortBy = document.getElementById('creditSort').value;
+  const when = r => String(r.sale.isoDate||'') + String(r.sale.time||'');
+  if(sortBy==='old') rows.sort((a,b)=> when(a)<when(b) ? -1 : when(a)>when(b) ? 1 : 0);
+  else if(sortBy==='name') rows.sort((a,b)=> String(a.sale.customer||'').localeCompare(String(b.sale.customer||'')) || (when(b)<when(a) ? -1 : 1));
+  else if(sortBy==='owing') rows.sort((a,b)=> b.owing-a.owing || (when(b)<when(a) ? -1 : 1));
+  else rows.sort((a,b)=> when(a)<when(b) ? 1 : when(a)>when(b) ? -1 : 0);
+  const owingAll = all.reduce((a,r)=>a+r.owing,0), openCount = all.filter(r=>r.owing>0).length;
+  document.getElementById('creditSummary').textContent = `${all.length} credit sale${all.length===1?'':'s'} in total. ${openCount} not fully paid, ${naira(owingAll)} still owed.`;
+  body.innerHTML = rows.map(r=>{
+    const s = r.sale;
+    const items = (s.lines||[]).map(l=>`${esc(l.name)} × ${l.qty}`).join('<br>') || '—';
+    return `<tr><td style="white-space:nowrap;">${esc(receiptDate(s))}<br><span class="mono" style="font-size:12px;color:var(--muted);">${esc(s.id)}</span></td>
+      <td>${esc(s.customer||'—')}</td><td style="white-space:normal;min-width:160px;">${items}</td>
+      <td class="mono">${naira(s.total)}</td><td class="mono">${naira(r.paid)}</td><td class="mono">${naira(r.owing)}</td>
+      <td><span class="pill ${r.status==='Paid'?'ok':'low'}">${r.status}</span></td></tr>`;
+  }).join('') || `<tr><td colspan="7" style="color:var(--muted);">No credit sales to show.</td></tr>`;
+}
+
 /* ================= Expenses ================= */
 function submitExpense(){
   const category = document.getElementById('newExpenseCategory').value;
@@ -1533,7 +1578,7 @@ function saveSettings(){
 document.getElementById('paperGroup').addEventListener('change', e=>{ document.querySelectorAll('#paperGroup label').forEach(l=>l.classList.toggle('checked', l.querySelector('input').checked)); });
 
 /* ================= Init ================= */
-function renderAll(){ renderDashboard(); renderInventory(); renderSaleSearch(); renderCart(); renderReports(); renderActivity(); renderCloseDay(); loadSettingsForm(); renderStaffManagement(); renderDebtors(); renderExpenses(); }
+function renderAll(){ renderDashboard(); renderInventory(); renderSaleSearch(); renderCart(); renderReports(); renderActivity(); renderCloseDay(); loadSettingsForm(); renderStaffManagement(); renderDebtors(); renderCredit(); renderExpenses(); }
 
 /* ================= Manage Staff (Admin only) =================
    Two things a real business genuinely needs, both free since they're just
