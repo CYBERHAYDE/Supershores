@@ -56,7 +56,7 @@ button[disabled]{cursor:progress}@media(prefers-reduced-motion:reduce){.ssspin,#
     <button data-view="inventory" data-i18n="navInv">Inventory</button>
     <button data-view="sale" data-i18n="navSale">Register Sale</button>
     <button data-view="reports" id="tabReports" data-i18n="navReports">Reports</button>
-    <button data-view="debtors" id="tabDebtors" data-i18n="navDebtors">Debtors</button>
+    <button data-view="debtors" id="tabDebtors" data-i18n="navDebtors">Debtors</button>     <button data-view="credit" id="tabCredit">Credit Sales</button>
     <button data-view="expenses" id="tabExpenses" data-i18n="navExpenses">Expenses</button>
     <button data-view="activity" id="tabActivity" data-i18n="navActivity">Activity Log</button>
     <button data-view="closeday" id="tabCloseday" data-i18n="navClose">Close Day</button>
@@ -266,7 +266,7 @@ button[disabled]{cursor:progress}@media(prefers-reduced-motion:reduce){.ssspin,#
     </div>
   </div>
 
-  <div class="view" id="view-expenses">
+  <div class="view" id="view-credit">     <h2 class="viewtitle">Credit Sales</h2>     <p class="viewsub">Every sale made on credit: who bought, when, what they took, and whether it is paid. Customer payments are counted against their oldest credit sale first.</p>     <div class="panel">       <div class="searchbar">         <input type="text" id="creditSearch" placeholder="Search customer or item…" oninput="renderCredit()">         <select id="creditFilter" onchange="renderCredit()">           <option value="all">All credit sales</option>           <option value="open">Still on credit</option>           <option value="paid">Paid</option>         </select>         <select id="creditSort" onchange="renderCredit()">           <option value="new">Newest first</option>           <option value="old">Oldest first</option>           <option value="name">Customer A to Z</option>           <option value="owing">Most owing first</option>         </select>       </div>       <p class="helptext" id="creditSummary" style="margin:8px 0;"></p>       <div class="tablewrap"><table class="ledger"><thead><tr><th>Date</th><th>Customer</th><th>Items purchased</th><th>Total</th><th>Paid</th><th>Owing</th><th>Status</th></tr></thead>       <tbody id="creditBody"></tbody></table></div>     </div>   </div>    <div class="view" id="view-expenses">
     <h2 class="viewtitle" data-i18n="expensesTitle">Expenses</h2>
     <p class="viewsub" data-i18n="expensesSub">Admin-only. Logged expenses are subtracted from gross profit in Reports to give you real net profit for the selected date range.</p>
     <div id="expensesLocked" class="locked-note" style="display:none;" data-i18n="expensesLockedTxt">Admin-only screen.</div>
@@ -410,7 +410,7 @@ button[disabled]{cursor:progress}@media(prefers-reduced-motion:reduce){.ssspin,#
     <div class="handle"></div>
     <button class="sheetitem" id="moreReports" onclick="fromMore('reports')"><span class="ic">📊</span> <span data-i18n="navReports">Reports</span></button>
     <button class="sheetitem" id="moreDebtors" onclick="fromMore('debtors')"><span class="ic">🧑‍🤝‍🧑</span> <span data-i18n="navDebtors">Debtors</span></button>
-    <button class="sheetitem" id="moreExpenses" onclick="fromMore('expenses')"><span class="ic">💸</span> <span data-i18n="navExpenses">Expenses</span></button>
+    <button class="sheetitem" id="moreCredit" onclick="fromMore('credit')"><span class="ic">📒</span> <span>Credit Sales</span></button>     <button class="sheetitem" id="moreExpenses" onclick="fromMore('expenses')"><span class="ic">💸</span> <span data-i18n="navExpenses">Expenses</span></button>
     <button class="sheetitem" id="moreActivity" onclick="fromMore('activity')"><span class="ic">🕵️</span> <span data-i18n="navActivity">Activity Log</span></button>
     <button class="sheetitem" id="moreCloseday" onclick="fromMore('closeday')"><span class="ic">🔒</span> <span data-i18n="navClose">Close Day</span></button>
     <button class="sheetitem" id="moreSettings" onclick="fromMore('settings')"><span class="ic">🧾</span> <span data-i18n="navSettings">Receipt Settings</span></button>
