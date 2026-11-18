@@ -105,7 +105,7 @@ SY.mItems=(list,batches)=>{const by={};items.forEach(i=>{if(i.sid)by[i.sid]=i;})
   L.forEach(e=>{const take=Math.min(Math.max(e.qty,0),used);used-=take;e.qty-=take;});i.batches=L.filter(e=>e.qty>0);}else i.batches=i.trackBatches?[]:null;});
  items=items.filter(i=>!i.sid||seen.has(i.sid));};
 SY.mLedger=rows=>{const all=ssGet('ss_ledger',[]),have=new Set(all.map(r=>r.EntryID));rows.forEach(r=>{if(!have.has(r.EntryID))all.push(r);});ssSet('ss_ledger',all);const by={};all.forEach(r=>{(by[r.CustomerID]=by[r.CustomerID]||[]).push(r);});
- debtors.forEach(d=>{const L=by[d.sid];if(!L)return;d.history=L.filter(r=>r.Type!=='VOID').sort((a,b)=>a.Timestamp<b.Timestamp?-1:1).map(r=>({date:String(r.Timestamp).slice(0,10),type:r.Type==='SALE'?'sale':'payment',amount:+r.Amount,saleId:r.LinkedSaleID||undefined}));});};
+ debtors.forEach(d=>{const L=by[d.sid];if(!L)return;d.history=L.filter(r=>r.Type!=='VOID').sort((a,b)=>a.Timestamp<b.Timestamp?-1:1).map(r=>({date:String(r.Timestamp).slice(0,10),type:r.Type==='SALE'?'sale':r.Type==='DISCOUNT'?'discount':'payment',amount:+r.Amount,saleId:r.LinkedSaleID||undefined}));});};
 SY.mSettings=s=>{const raw=s&&s.AppSettingsJSON;if(!raw||raw===SY.blob())return;let o;try{o=JSON.parse(raw);}catch(e){return;}
  const keep=settings.logo;Object.assign(settings,o.s);if(!o.s.logo)settings.logo=keep||window.SS_LOGO;if(Array.isArray(o.branches)&&o.branches.length)branches=o.branches;
  if(!('receiptTpl' in o.s))delete settings.receiptTpl;   // switching back to the standard receipt must reach every phone
