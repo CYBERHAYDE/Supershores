@@ -14,7 +14,7 @@ SY.chip=m=>{let c=document.getElementById('syChip');if(!c){c=document.createElem
  const n=syQ().length,f=ssGet('ss_failed',[]).length;c.textContent=m||(f?`${f} refused, tap to see`:!navigator.onLine?`Offline${n?', '+n+' waiting':''}`:n?`${n} waiting to sync`:'Synced');c.style.color=f?'#b3261e':'#333';c.classList.toggle('syncing',m==='Syncing...');c.hidden=!currentUser;};
 
 /* ---- 1. Work out what changed, after every save ---- */
-SY.sids=()=>{const d=syDev(),u=()=>Math.random().toString(36).slice(2,6);let made=false;items.forEach(i=>{if(!i.sid){i.sid='I-'+d+'-'+i.id+'-'+u();made=true;}});debtors.forEach(x=>{if(!x.sid){x.sid='C-'+d+'-'+syNum(x.id);made=true;}});expenses.forEach(e=>{if(!e.sid){e.sid='E-'+d+'-'+syNum(e.id)+'-'+u();made=true;}});
+SY.sids=()=>{const d=syDev(),u=()=>Math.random().toString(36).slice(2,6);let made=false;items.forEach(i=>{if(!i.sid){i.sid='I-'+d+'-'+i.id+'-'+u();made=true;}});debtors.forEach(x=>{if(!x.sid){x.sid='C-'+d+'-'+syNum(x.id)+'-'+u();made=true;}});expenses.forEach(e=>{if(!e.sid){e.sid='E-'+d+'-'+syNum(e.id)+'-'+u();made=true;}});
  if(made){const m=SY.merging;SY.merging=true;try{persistItems();persistDebtors();persistExpenses();}finally{SY.merging=m;}}};   // the random tail stops a new item or expense from reusing the ID of one that was deleted
 SY.blob=()=>{const x=Object.assign({},settings);delete x.logo;delete x.logoHave;delete x.logoWant;return JSON.stringify({s:x,branches});};   // the logo travels separately, so the settings stay small
 const syLogo=()=>settings.logo&&settings.logo!==window.SS_LOGO?settings.logo.length+':'+settings.logo.slice(-20):'';
@@ -79,12 +79,12 @@ SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.l
 SY.relogin=()=>{if(SY.rl||!currentUser)return;SY.rl=true;setTimeout(()=>{SY.rl=false;},8000);
  alert('Please sign in again. Your sign-in has expired, or your password or access was changed. Anything not yet sent is safe on this phone and will sync after you sign in.');logout();};
 SY.fixSale=(o,r)=>{const s=sales.find(x=>x.id===o.payload.saleId);if(s&&r&&+s.total!==+r.total){SY.merging=true;s.subtotal=r.subtotal-r.discount;s.vatAmount=r.vat;s.total=r.total;persistSales();ssSet('ss_snap',SY.shape());SY.merging=false;}};
-SY.pull=async()=>{const p=await SS.api('pull',{token:currentUser.token,since:ssGet('ss_since',null)});if(p.me&&p.me.perms){currentUser.perms=p.me.perms;const cu=users.find(x=>x.id===currentUser.id);if(cu)cu.perms=p.me.perms;persistUsers();applyRoleLocks();}
+SY.pull=async()=>{const fresh=ssGet('ss_pullv',null)!=='2';if(fresh)ssSet('ss_audit',[]);   // one full re-pull so anything missed earlier comes back  const p=await SS.api('pull',{token:currentUser.token,since:fresh?null:ssGet('ss_since',null)});if(p.me&&p.me.perms){currentUser.perms=p.me.perms;const cu=users.find(x=>x.id===currentUser.id);if(cu)cu.perms=p.me.perms;persistUsers();applyRoleLocks();}
  const ep=String((p.settings&&p.settings.DataEpoch)||'0'),mine=ssGet('ss_epoch',null);if(mine===null)ssSet('ss_epoch',ep);else if(mine!==ep){SY.wipeLocal(ep);return SY.pull();}   // the admin reset the data: start clean too
 clearTimeout(SY.dt);SY.diff();if(syQ().length)return;
  const before=JSON.stringify([items,debtors,sales.length,expenses,activityLog.length]);SY.merging=true;
  try{SY.mSettings(p.settings);SY.mItems(p.items,p.batches);SY.mDebtors(p.debtors);SY.mLedger(p.debtorLedger||[]);SY.mSales(p);if(p.expenses)SY.mExp(p.expenses);if(p.auditLog&&currentUser.role==='admin')SY.mAudit(p.auditLog);
-  persistItems();persistDebtors();persistSales();persistExpenses();persistLog();ssSet('ss_snap',SY.shape());ssSet('ss_since',p.serverTime);}finally{SY.merging=false;}
+  persistItems();persistDebtors();persistSales();persistExpenses();persistLog();ssSet('ss_snap',SY.shape());ssSet('ss_since',p.serverTime);ssSet('ss_pullv','2');}finally{SY.merging=false;}
  if(currentUser.role==='admin'&&p.settings&&String(Number(p.settings.VatRate)||0)!==String(Number(settings.vatRate)||0)){SY.q('settings.update',{changes:{VatRate:String(Number(settings.vatRate)||0)}});setTimeout(SY.kick,1500);}   // an admin whose VAT was set before this fix sends it to the server once
  await SY.fetchPhotos();populateCategoryFilters();const typing=/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'');if(before!==JSON.stringify([items,debtors,sales.length,expenses,activityLog.length])&&!typing)renderAll();};
 SY.wipeLocal=ep=>{SY.merging=true;try{items=[];sales=[];debtors=[];expenses=[];persistItems();persistSales();persistDebtors();persistExpenses();ssSet('ss_q',[]);ssSet('ss_failed',[]);ssSet('ss_ledger',[]);ssSet('ss_since',null);ssSet('ss_snap',null);ssSet('ss_epoch',String(ep));}finally{SY.merging=false;}populateCategoryFilters();renderAll();SY.chip();};
@@ -115,7 +115,7 @@ SY.mDebtors=list=>{const by={};debtors.forEach(d=>{if(d.sid)by[d.sid]=d;});let n
  list.forEach(x=>{let d=by[x.CustomerID];if(!d){d={id:'CU-'+String(++n).padStart(3,'0'),sid:x.CustomerID,history:[]};debtors.push(d);}d.name=String(x.Name??'');d.phone=String(x.Phone||'');d.balance=+x.Balance||0;});};
 SY.mSales=p=>{const lines={},cust={},dn={};debtors.forEach(d=>{if(d.sid)cust[d.sid]=d.name;});p.saleItems.forEach(l=>{(lines[l.SaleID]=lines[l.SaleID]||[]).push({name:l.ItemName,qty:+l.Quantity,price:+l.UnitPrice,itemId:(items.find(i=>i.sid===l.ItemID)||{}).id,cost:(l.UnitCost===undefined||l.UnitCost==='')?null:+l.UnitCost});});
  const day=todayIso();
- p.sales.forEach(x=>{if(sales.some(s=>s.id===x.SaleID))return;const d=new Date(x.Timestamp),iso=localIso(d);
+ p.sales.forEach(x=>{const have=sales.find(s=>s.id===x.SaleID);if(have){if(!(have.lines&&have.lines.length)&&lines[x.SaleID])have.lines=lines[x.SaleID];return;}const d=new Date(x.Timestamp),iso=localIso(d);
   sales.push({id:x.SaleID,date:iso===day?'Today':d.toLocaleDateString('en-NG',{weekday:'short'}),isoDate:iso,time:d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),staff:`${x.StaffName} (${x.StaffID})`,payment:x.PaymentMethod,
    subtotal:+x.Subtotal-+x.DiscountAmount,vatRate:+(p.settings.VatRate||0),vatAmount:+x.VatAmount,total:+x.TotalAmount,customer:cust[x.CustomerID]||'',refunded:false,
    discount:+x.DiscountAmount>0?{amount:+x.DiscountAmount,reason:x.DiscountReason,authorizedBy:x.DiscountAuthorizedBy}:null,lines:lines[x.SaleID]||[]});});
