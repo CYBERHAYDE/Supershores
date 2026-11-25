@@ -1,7 +1,7 @@
 /* Supershores bridge. Loads after the demo's app.js and replaces only: sign-in, staff management,
    and adds the subscription lock, renewal upload and automatic updates. Every other screen is the demo's own. */
 const SS={API:'https://script.google.com/macros/s/AKfycbyR4tyWCQ7OVLSfhe3UUr2vsZRzH_Ywf_5b8AYKhfytYYiy9BocFUBnbXbXKjdmeIjtfA/exec',token:null,lic:null};
-SS.api=async(action,body={})=>{const r=await fetch(SS.API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...body})});
+SS.api=async(action,body={})=>{const r=await fetch(SS.API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...body}),signal:(window.AbortSignal&&AbortSignal.timeout)?AbortSignal.timeout(150000):undefined});
  const j=await r.json();if(!j.ok){const e=new Error(j.error);e.code=j.code;throw e;}return j.data;};
 /* Loading feedback: a thin bar at the top while something the person tapped is waiting on the server */
 {const FG=['login','firstRun','staff.list','staff.add','staff.resetPasscode','staff.setActive','staff.update','staff.delete','staff.setPerms','changePasscode','authorizeDiscount','payment.submit','discount.decide','data.reset','registerDevice'],raw=SS.api;let pend=0,tm;
