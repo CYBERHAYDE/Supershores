@@ -10,7 +10,7 @@ SY.adj={};
 SY.q=(type,payload)=>{const q=syQ();q.push({opId:'op-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),type,payload,ts:new Date().toISOString(),by:currentUser.id,token:currentUser.token,offline:!navigator.onLine});syQSave(q);SY.kick();};
 SY.kick=()=>{clearTimeout(SY.kt);SY.kt=setTimeout(SY.sync,400);};
 SY.chip=m=>{let c=document.getElementById('syChip');if(!c){c=document.createElement('button');c.id='syChip';c.style.cssText='position:fixed;left:8px;bottom:72px;z-index:60;font:600 11px var(--font-sans,sans-serif);padding:3px 10px;border-radius:99px;border:1px solid var(--paper-line,#ccc);background:#fff;color:#333;opacity:.9;cursor:pointer';
-  c.onclick=()=>{const f=ssGet('ss_failed',[]);if(!f.length)return alert(SY.lastError&&syQ().length?'Syncing hit a problem and will retry on its own:\n'+SY.lastError:'Everything is in step with the server.');alert('These changes were refused by the server:\n\n'+f.map(x=>`${x.type} ${x.id}: ${x.error}`).join('\n')+'\n\nThe screens now show the server\'s version.');ssSet('ss_failed',[]);SY.chip();};document.body.append(c);}
+  c.onclick=()=>{const f=ssGet('ss_failed',[]);if(!f.length)return alert(SY.lastProblem?'Syncing hit a problem and will retry on its own:\n'+SY.lastProblem:'Everything is in step with the server.');alert('These changes were refused by the server:\n\n'+f.map(x=>`${x.type} ${x.id}: ${x.error}`).join('\n')+'\n\nThe screens now show the server\'s version.');ssSet('ss_failed',[]);SY.chip();};document.body.append(c);}
  const n=syQ().length,f=ssGet('ss_failed',[]).length;c.textContent=m||(f?`${f} refused, tap to see`:!navigator.onLine?`Offline${n?', '+n+' waiting':''}`:n?`${n} waiting to sync`:'Synced');c.style.color=f?'#b3261e':'#333';c.classList.toggle('syncing',m==='Syncing...');c.hidden=!currentUser;};
 
 /* ---- 1. Work out what changed, after every save ---- */
@@ -74,17 +74,18 @@ SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.l
    if(err||small){q=q.filter(z=>z!==o);if(err){const bad=ssGet('ss_failed',[]);bad.push({type:'photo',error:err,id:o.payload.itemId});ssSet('ss_failed',bad);}}}
   syQSave(q);
   if(!q.length)await SY.pull();else if(q.length<n0)setTimeout(SY.sync,400);
- }catch(e){if(e.code==='LICENSE_LOCKED')ssLock();else if(e.code==='AUTH'){SY.busy=false;SY.relogin();}else{SY.lastError=e.message+' @ '+String(e.stack||'').split('\n')[1];console.warn('Sync problem:',SY.lastError);}}
+ }catch(e){if(e.code==='LICENSE_LOCKED')ssLock();else if(e.code==='AUTH'){SY.busy=false;SY.relogin();}else{SY.lastError=e.message+' @ '+String(e.stack||'').split('\n')[1];console.warn('Sync problem:',SY.lastError);SY.lastProblem=SY.lastError;}}
  SY.busy=false;SY.chip(SY.lastError?'Sync problem, tap to see':undefined);};
 SY.relogin=()=>{if(SY.rl||!currentUser)return;SY.rl=true;setTimeout(()=>{SY.rl=false;},8000);
  alert('Please sign in again. Your sign-in has expired, or your password or access was changed. Anything not yet sent is safe on this phone and will sync after you sign in.');logout();};
 SY.fixSale=(o,r)=>{const s=sales.find(x=>x.id===o.payload.saleId);if(s&&r&&+s.total!==+r.total){SY.merging=true;s.subtotal=r.subtotal-r.discount;s.vatAmount=r.vat;s.total=r.total;persistSales();ssSet('ss_snap',SY.shape());SY.merging=false;}};
-SY.pull=async()=>{const fresh=ssGet('ss_pullv',null)!=='2';if(fresh)ssSet('ss_audit',[]);   // one full re-pull so anything missed earlier comes back  const p=await SS.api('pull',{token:currentUser.token,since:fresh?null:ssGet('ss_since',null)});if(p.me&&p.me.perms){currentUser.perms=p.me.perms;const cu=users.find(x=>x.id===currentUser.id);if(cu)cu.perms=p.me.perms;persistUsers();applyRoleLocks();}
+SY.pull=async()=>{const fresh=ssGet('ss_pullv',null)!=='2';if(fresh)ssSet('ss_audit',[]);   /* one full re-pull so anything missed earlier comes back */
+ const p=await SS.api('pull',{token:currentUser.token,since:fresh?null:ssGet('ss_since',null)});if(p.me&&p.me.perms){currentUser.perms=p.me.perms;const cu=users.find(x=>x.id===currentUser.id);if(cu)cu.perms=p.me.perms;persistUsers();applyRoleLocks();}
  const ep=String((p.settings&&p.settings.DataEpoch)||'0'),mine=ssGet('ss_epoch',null);if(mine===null)ssSet('ss_epoch',ep);else if(mine!==ep){SY.wipeLocal(ep);return SY.pull();}   // the admin reset the data: start clean too
 clearTimeout(SY.dt);SY.diff();if(syQ().length)return;
  const before=JSON.stringify([items,debtors,sales.length,expenses,activityLog.length]);SY.merging=true;
  try{SY.mSettings(p.settings);SY.mItems(p.items,p.batches);SY.mDebtors(p.debtors);SY.mLedger(p.debtorLedger||[]);SY.mSales(p);if(p.expenses)SY.mExp(p.expenses);if(p.auditLog&&currentUser.role==='admin')SY.mAudit(p.auditLog);
-  persistItems();persistDebtors();persistSales();persistExpenses();persistLog();ssSet('ss_snap',SY.shape());ssSet('ss_since',p.serverTime);ssSet('ss_pullv','2');}finally{SY.merging=false;}
+  persistItems();persistDebtors();persistSales();persistExpenses();persistLog();ssSet('ss_snap',SY.shape());ssSet('ss_since',p.serverTime);ssSet('ss_pullv','2');SY.lastProblem=null;}finally{SY.merging=false;}
  if(currentUser.role==='admin'&&p.settings&&String(Number(p.settings.VatRate)||0)!==String(Number(settings.vatRate)||0)){SY.q('settings.update',{changes:{VatRate:String(Number(settings.vatRate)||0)}});setTimeout(SY.kick,1500);}   // an admin whose VAT was set before this fix sends it to the server once
  await SY.fetchPhotos();populateCategoryFilters();const typing=/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'');if(before!==JSON.stringify([items,debtors,sales.length,expenses,activityLog.length])&&!typing)renderAll();};
 SY.wipeLocal=ep=>{SY.merging=true;try{items=[];sales=[];debtors=[];expenses=[];persistItems();persistSales();persistDebtors();persistExpenses();ssSet('ss_q',[]);ssSet('ss_failed',[]);ssSet('ss_ledger',[]);ssSet('ss_since',null);ssSet('ss_snap',null);ssSet('ss_epoch',String(ep));}finally{SY.merging=false;}populateCategoryFilters();renderAll();SY.chip();};
