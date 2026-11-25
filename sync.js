@@ -57,7 +57,7 @@ logActivity=function(a){syLog(a);if(!SY.merging&&currentUser&&!COVERED.test(a))S
 
 /* ---- 2. Send, then bring the server's version back ---- */
 SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.locked))return;clearTimeout(SY.dt);SY.diff();   // process any change that has not been looked at yet, so a refresh can never skip it
- SY.busy=true;SY.chip('Syncing...');
+ SY.busy=true;SY.lastError=null;SY.chip('Syncing...');
  try{let q=syQ();{const pk=ssGet('ss_parked',[]);if(pk.some(o=>o.by===currentUser.id)){q=q.concat(pk.filter(o=>o.by===currentUser.id));ssSet('ss_parked',pk.filter(o=>o.by!==currentUser.id));}}
   q.forEach(o=>{if(o.by===currentUser.id)o.token=currentUser.token;});
   syQSave(q);const n0=q.length;const sendable=q.filter(o=>o.type!=='__photo');
@@ -75,7 +75,7 @@ SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.l
   syQSave(q);
   if(!q.length)await SY.pull();else if(q.length<n0)setTimeout(SY.sync,400);
  }catch(e){if(e.code==='LICENSE_LOCKED')ssLock();else if(e.code==='AUTH'){SY.busy=false;SY.relogin();}else{SY.lastError=e.message+' @ '+String(e.stack||'').split('\n')[1];console.warn('Sync problem:',SY.lastError);}}
- SY.busy=false;SY.chip(SY.lastError&&syQ().length?'Sync problem, will retry':undefined);};
+ SY.busy=false;SY.chip(SY.lastError?'Sync problem, tap to see':undefined);};
 SY.relogin=()=>{if(SY.rl||!currentUser)return;SY.rl=true;setTimeout(()=>{SY.rl=false;},8000);
  alert('Please sign in again. Your sign-in has expired, or your password or access was changed. Anything not yet sent is safe on this phone and will sync after you sign in.');logout();};
 SY.fixSale=(o,r)=>{const s=sales.find(x=>x.id===o.payload.saleId);if(s&&r&&+s.total!==+r.total){SY.merging=true;s.subtotal=r.subtotal-r.discount;s.vatAmount=r.vat;s.total=r.total;persistSales();ssSet('ss_snap',SY.shape());SY.merging=false;}};
