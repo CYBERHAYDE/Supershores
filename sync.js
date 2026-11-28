@@ -11,7 +11,7 @@ SY.q=(type,payload)=>{const q=syQ();q.push({opId:'op-'+Date.now().toString(36)+M
 SY.kick=()=>{clearTimeout(SY.kt);SY.kt=setTimeout(SY.sync,400);};
 SY.chip=m=>{let c=document.getElementById('syChip');if(!c){c=document.createElement('button');c.id='syChip';c.style.cssText='position:fixed;left:8px;bottom:72px;z-index:60;font:600 11px var(--font-sans,sans-serif);padding:3px 10px;border-radius:99px;border:1px solid var(--paper-line,#ccc);background:#fff;color:#333;opacity:.9;cursor:pointer';
   c.onclick=()=>{const f=ssGet('ss_failed',[]);if(!f.length)return alert(SY.lastProblem?'Syncing hit a problem and will retry on its own:\n'+SY.lastProblem:'Everything is in step with the server.');alert('These changes were refused by the server:\n\n'+f.map(x=>`${x.type} ${x.id}: ${x.error}`).join('\n')+'\n\nThe screens now show the server\'s version.');ssSet('ss_failed',[]);SY.chip();};document.body.append(c);}
- const n=syQ().length,f=ssGet('ss_failed',[]).length;c.textContent=m||(f?`${f} refused, tap to see`:!navigator.onLine?`Offline${n?', '+n+' waiting':''}`:n?`${n} waiting to sync`:'Synced');c.style.color=f?'#b3261e':'#333';c.classList.toggle('syncing',m==='Syncing...');c.hidden=!currentUser;};
+ const n=syQ().length,f=ssGet('ss_failed',[]).length;c.textContent=(m||(f?`${f} refused, tap to see`:!navigator.onLine?`Offline${n?', '+n+' waiting':''}`:n?`${n} waiting to sync`:'Synced'))+' · s56';c.style.color=f?'#b3261e':'#333';c.classList.toggle('syncing',m==='Syncing...');c.hidden=!currentUser;};
 
 /* ---- 1. Work out what changed, after every save ---- */
 SY.sids=()=>{const d=syDev(),u=()=>Math.random().toString(36).slice(2,6);let made=false;items.forEach(i=>{if(!i.sid){i.sid='I-'+d+'-'+i.id+'-'+u();made=true;}});debtors.forEach(x=>{if(!x.sid){x.sid='C-'+d+'-'+syNum(x.id)+'-'+u();made=true;}});expenses.forEach(e=>{if(!e.sid){e.sid='E-'+d+'-'+syNum(e.id)+'-'+u();made=true;}});
@@ -24,11 +24,11 @@ SY.shape=()=>({settings:SY.blob(),logoMark:syLogo(),items:Object.fromEntries(ite
 SY.sched=()=>{clearTimeout(SY.dt);SY.dt=setTimeout(SY.diff,0);};
 const newBatch=(i,o)=>{const b=(i.batches||[]).filter(x=>!(o.bc||[]).includes(x.code)).pop();return b?{code:b.code,expiry:b.expiry||'',dateAdded:b.dateAdded}:{code:'RESTOCK',expiry:'',dateAdded:todayIso()};};
 SY.diff=()=>{if(SY.merging||!currentUser||!syDev())return;SY.sids();const old=ssGet('ss_snap',null),now=SY.shape();if(!old){ssSet('ss_snap',now);return;}
- const ops=[],photos=[],byId=id=>items.find(i=>i.id===id),lineItem=l=>byId(l.itemId)||items.find(i=>i.name===l.name),delta={};
+ let pidMade=false;const ops=[],photos=[],byId=id=>items.find(i=>i.id===id),lineItem=l=>byId(l.itemId)||items.find(i=>i.name===l.name),delta={};
  const draw=(l,sign)=>{const x=lineItem(l);if(!x||x.service)return;(x.bundle?x.bundle.map(c=>[c.itemId,c.qty*l.qty]):[[x.id,l.qty]]).forEach(([id,n])=>{delta[id]=(delta[id]||0)+sign*n;});};
  const newSales=sales.filter(s=>old.sales[s.id]===undefined),refunded=sales.filter(s=>old.sales[s.id]===false&&s.refunded);
  newSales.forEach(s=>s.lines.forEach(l=>draw(l,-1)));refunded.forEach(s=>s.lines.forEach(l=>draw(l,1)));
- debtors.forEach(d=>{const n=old.debtors[d.id];if(n===undefined)ops.push(['debtor.add',{customerId:d.sid,name:d.name,phone:d.phone||''}]);else (d.history||[]).slice(n).forEach(h=>{if(h.type==='payment')ops.push(['debtor.payment',{customerId:d.sid,amount:h.amount}]);});});
+ debtors.forEach(d=>{const n=old.debtors[d.id];if(n===undefined)ops.push(['debtor.add',{customerId:d.sid,name:d.name,phone:d.phone||''}]);else (d.history||[]).slice(n).forEach(h=>{if(h.type==='payment'){h.pid=h.pid||('P-'+syDev()+'-'+Math.random().toString(36).slice(2,8));pidMade=true;ops.push(['debtor.payment',{customerId:d.sid,amount:h.amount,paymentId:h.pid}]);}});});
  {const del=ssGet('ss_del',[]);if(del.length){del.forEach(sid=>ops.push(['item.setActive',{itemId:sid,active:false}]));ssSet('ss_del',[]);}}
              items.forEach(i=>{const o=old.items[i.id];
   if(currentUser.role==='admin'&&i.photo&&String(i.photo).startsWith('data:')&&(!o||o.ph!==syPh(i)))photos.push({itemId:i.sid,dataUrl:i.photo});
@@ -49,6 +49,7 @@ SY.diff=()=>{if(SY.merging||!currentUser||!syDev())return;SY.sids();const old=ss
 if(currentUser.role==='admin'){const lm=now.logoMark;if(lm&&lm!==(old.logoMark||''))photos.push({itemId:'LOGO',dataUrl:settings.logo,logo:true});
   else if(!lm&&old.logoMark&&settings.logoVer!=='none'){settings.logoVer='none';settings.logoHave='none';persistSettings();now.settings=SY.blob();}}
  if(currentUser.role==='admin'&&old.settings!==now.settings)ops.push(['settings.update',{changes:{AppSettingsJSON:now.settings,VatRate:String(Number(settings.vatRate)||0)}}]);   // the server prices every sale, so it needs the VAT rate too
+ if(pidMade){SY.merging=true;try{persistDebtors();}finally{SY.merging=false;}}
  ssSet('ss_snap',now);ops.forEach(([t,p])=>SY.q(t,p));photos.forEach(p=>SY.q('__photo',p));};
 ['persistItems','persistSales','persistDebtors','persistExpenses','persistSettings','persistBranches'].forEach(n=>{const o=window[n];window[n]=function(){o();SY.sched();};});
 const syClose=confirmCloseDay;confirmCloseDay=function(){const c=Number(document.getElementById('countedCash').value)||0;syClose();SY.q('cash.close',{date:todayIso(),counted:c});};
@@ -60,7 +61,7 @@ SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.l
  SY.busy=true;SY.lastError=null;SY.chip('Syncing...');
  try{let q=syQ();{const pk=ssGet('ss_parked',[]);if(pk.some(o=>o.by===currentUser.id)){q=q.concat(pk.filter(o=>o.by===currentUser.id));ssSet('ss_parked',pk.filter(o=>o.by!==currentUser.id));}}
   q.forEach(o=>{if(o.by===currentUser.id)o.token=currentUser.token;});
-  syQSave(q);const n0=q.length;const sendable=q.filter(o=>o.type!=='__photo');
+  syQSave(q);const n0=q.length,start=new Set(q.map(o=>o.opId)),keep=()=>q.concat(syQ().filter(o=>!start.has(o.opId)));const sendable=q.filter(o=>o.type!=='__photo');
   if(sendable.length){const d=await SS.api('push',{ops:sendable.slice(0,50).map(({by,...o})=>o)}),bad=ssGet('ss_failed',[]);
    let authLost=false;
    d.results.forEach(r=>{const o=q.find(x=>x.opId===r.opId);if(!o)return;
@@ -68,26 +69,73 @@ SY.sync=async()=>{if(SY.busy||!navigator.onLine||!currentUser||(SS.lic&&SS.lic.l
     if(r.status==='ok'||r.status==='duplicate'){q=q.filter(x=>x!==o);if(r.status==='ok'&&o.type==='sale.create')SY.fixSale(o,r.result);}
     else if(r.status==='error'){o.tries=(o.tries||0)+1;if(o.tries>=5){q=q.filter(x=>x!==o);bad.push({type:o.type,error:'The server could not process this after several tries.',id:o.payload.saleId||o.payload.itemId||o.payload.customerId||''});}}
     else if(r.status==='rejected'){q=q.filter(x=>x!==o);bad.push({type:o.type,error:r.error,id:o.payload.saleId||o.payload.name||o.payload.itemId||o.payload.customerId||''});}});
-   syQSave(q);ssSet('ss_failed',bad);if(authLost){SY.busy=false;return SY.relogin();}}
+   syQSave(keep());ssSet('ss_failed',bad);if(authLost){SY.busy=false;return SY.relogin();}}
   for(const o of q.filter(x=>x.type==='__photo')){const small=await SY.shrink(o.payload.dataUrl,o.payload.logo?46000:42000);let err=small?null:'The photo could not be made small enough.';
    if(small)try{const r=await SS.api('photo.put',{token:currentUser.token,itemId:o.payload.itemId,dataUrl:small});if(o.payload.logo){settings.logoVer=r.marker;settings.logoHave=r.marker;persistSettings();}else{const it=items.find(i=>i.sid===o.payload.itemId);if(it){it.photoUrl=r.marker;persistItems();}}}catch(e){if(e.code)err=e.message;else break;}
    if(err||small){q=q.filter(z=>z!==o);if(err){const bad=ssGet('ss_failed',[]);bad.push({type:'photo',error:err,id:o.payload.itemId});ssSet('ss_failed',bad);}}}
-  syQSave(q);
-  if(!q.length)await SY.pull();else if(q.length<n0)setTimeout(SY.sync,400);
+  q=keep();syQSave(q);
+  if(!q.length)await SY.pull();else if(q.length<n0||q.some(o=>!start.has(o.opId)))setTimeout(SY.sync,400);
  }catch(e){if(e.code==='LICENSE_LOCKED')ssLock();else if(e.code==='AUTH'){SY.busy=false;SY.relogin();}else{SY.lastError=e.message+' @ '+String(e.stack||'').split('\n')[1];console.warn('Sync problem:',SY.lastError);SY.lastProblem=SY.lastError;}}
  SY.busy=false;SY.chip(SY.lastError?'Sync problem, tap to see':undefined);};
 SY.relogin=()=>{if(SY.rl||!currentUser)return;SY.rl=true;setTimeout(()=>{SY.rl=false;},8000);
  alert('Please sign in again. Your sign-in has expired, or your password or access was changed. Anything not yet sent is safe on this phone and will sync after you sign in.');logout();};
 SY.fixSale=(o,r)=>{const s=sales.find(x=>x.id===o.payload.saleId);if(s&&r&&+s.total!==+r.total){SY.merging=true;s.subtotal=r.subtotal-r.discount;s.vatAmount=r.vat;s.total=r.total;persistSales();ssSet('ss_snap',SY.shape());SY.merging=false;}};
-SY.pull=async()=>{const fresh=ssGet('ss_pullv',null)!=='2';if(fresh)ssSet('ss_audit',[]);   /* one full re-pull so anything missed earlier comes back */
+SY.pull=async()=>{const fresh=ssGet('ss_pullv',null)!=='4';if(fresh)ssSet('ss_audit',[]);   /* one full re-pull so anything missed earlier comes back */
  const p=await SS.api('pull',{token:currentUser.token,since:fresh?null:ssGet('ss_since',null)});if(p.me&&p.me.perms){currentUser.perms=p.me.perms;const cu=users.find(x=>x.id===currentUser.id);if(cu)cu.perms=p.me.perms;persistUsers();applyRoleLocks();}
  const ep=String((p.settings&&p.settings.DataEpoch)||'0'),mine=ssGet('ss_epoch',null);if(mine===null)ssSet('ss_epoch',ep);else if(mine!==ep){SY.wipeLocal(ep);return SY.pull();}   // the admin reset the data: start clean too
 clearTimeout(SY.dt);SY.diff();if(syQ().length)return;
+ const lostPay=fresh?SY.lostPayments(p):[];
  const before=JSON.stringify([items,debtors,sales.length,expenses,activityLog.length]);SY.merging=true;
  try{SY.mSettings(p.settings);SY.mItems(p.items,p.batches);SY.mDebtors(p.debtors);SY.mLedger(p.debtorLedger||[]);SY.mSales(p);if(p.expenses)SY.mExp(p.expenses);if(p.auditLog&&currentUser.role==='admin')SY.mAudit(p.auditLog);
-  persistItems();persistDebtors();persistSales();persistExpenses();persistLog();ssSet('ss_snap',SY.shape());ssSet('ss_since',p.serverTime);ssSet('ss_pullv','2');SY.lastProblem=null;}finally{SY.merging=false;}
+  persistItems();persistDebtors();persistSales();persistExpenses();persistLog();ssSet('ss_snap',SY.shape());ssSet('ss_since',p.serverTime);ssSet('ss_pullv','4');SY.lastProblem=null;}finally{SY.merging=false;}
+ if(fresh)SY.recover(p,lostPay);
  if(currentUser.role==='admin'&&p.settings&&String(Number(p.settings.VatRate)||0)!==String(Number(settings.vatRate)||0)){SY.q('settings.update',{changes:{VatRate:String(Number(settings.vatRate)||0)}});setTimeout(SY.kick,1500);}   // an admin whose VAT was set before this fix sends it to the server once
- await SY.fetchPhotos();populateCategoryFilters();const typing=/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'');if(before!==JSON.stringify([items,debtors,sales.length,expenses,activityLog.length])&&!typing)renderAll();};
+ SY.verify();await SY.fetchPhotos();populateCategoryFilters();const typing=/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'');if(before!==JSON.stringify([items,debtors,sales.length,expenses,activityLog.length])&&!typing)renderAll();};
+/* Customer payments recorded on this phone that the server has no record of. Worked out before the server's ledger replaces the phone's copy.
+   A payment with an ID is matched by that ID. An older one without an ID is matched by amount, and given an ID so it can never be recorded twice. */
+SY.lostPayments=p=>{const out=[];try{const by={},known=new Set((p.debtors||[]).map(x=>x.CustomerID));let made=false;
+ (p.debtorLedger||[]).forEach(r=>{if(r.Type==='PAYMENT'||r.Type==='DISCOUNT')(by[r.CustomerID]=by[r.CustomerID]||[]).push({id:r.EntryID,a:+r.Amount});});   // older copies stored approved discounts as payments, so they are matched too
+ debtors.forEach(d=>{if(!d.sid||!known.has(d.sid))return;const srv=(by[d.sid]||[]).slice(),pays=(d.history||[]).filter(h=>h.type==='payment');
+  pays.filter(h=>h.pid).forEach(h=>{const i=srv.findIndex(x=>x.id===h.pid);if(i>=0)srv.splice(i,1);else out.push({sid:d.sid,amount:+h.amount,date:h.date,pid:h.pid});});
+  pays.filter(h=>!h.pid).forEach(h=>{const i=srv.findIndex(x=>x.a===+h.amount);if(i>=0)srv.splice(i,1);else if(+h.amount>0){h.pid='P-'+syDev()+'-'+Math.random().toString(36).slice(2,8);made=true;out.push({sid:d.sid,amount:+h.amount,date:h.date,pid:h.pid});}});});
+ if(made){const m=SY.merging;SY.merging=true;try{persistDebtors();}finally{SY.merging=m;}}
+ }catch(e){console.warn('Payment check problem:',e);}return out;};
+/* Helpers for sending a change again with the time it was really made. */
+SY.qAt=(type,payload,ts)=>{const q=syQ();q.push({opId:'op-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),type,payload,ts,by:currentUser.id,token:currentUser.token,offline:false});syQSave(q);};
+SY.noon=d=>{const t=new Date(String(d||'').slice(0,10)+'T12:00:00');return isNaN(t)?new Date().toISOString():t.toISOString();};
+SY.when=s=>{const m=/(\d{1,2}):(\d{2})\s*([ap])?/i.exec(String(s.time||''));let h=m?+m[1]:12;const mi=m?+m[2]:0;if(m&&m[3])h=h%12+(m[3].toLowerCase()==='p'?12:0);const [y,mo,d]=String(s.isoDate).split('-').map(Number),t=new Date(y,mo-1,d,h,mi);return isNaN(t)?new Date().toISOString():t.toISOString();};
+/* Sends sales again. The same sale is sent again at most twice this way, so a sale the server keeps refusing can never loop. */
+SY.resend=(list,custMissing)=>{const rs=ssGet('ss_rs',{}),li=l=>items.find(i=>i.id===l.itemId)||items.find(i=>i.name===l.name),addedC=new Set();let asRequest=0;
+ const vOK=v=>{try{return JSON.parse(atob(String(v).split('.')[0].replace(/-/g,'+').replace(/_/g,'/'))).exp>Date.now()+60000;}catch(e){return false;}};   // an admin's discount approval only lasts 15 minutes
+ list=list.filter(s=>(rs[s.id]||0)<2);if(!list.length)return {n:0,asRequest:0};
+ list.forEach(s=>{rs[s.id]=(rs[s.id]||0)+1;const c=s.payment==='Credit'?debtors.find(d=>String(d.name).toLowerCase()===String(s.customer||'').toLowerCase().trim()):null;let dc=s.discount;
+  if(dc&&dc.voucher&&!vOK(dc.voucher)){s.pendingDiscount={amount:dc.amount,reason:dc.reason||''};s.discountStatus='Pending';s.discount=null;dc=null;asRequest++;}   // approval has expired: the sale goes in at full price and waits for the admin, like any discount request
+  if(c&&c.sid&&custMissing(c.sid)&&!addedC.has(c.sid)){SY.qAt('debtor.add',{customerId:c.sid,name:c.name,phone:c.phone||''},SY.when(s));addedC.add(c.sid);}
+  SY.qAt('sale.create',{saleId:s.id,lines:s.lines.map(l=>({itemId:(li(l)||{}).sid,qty:l.qty})),payment:s.payment,customerId:c?c.sid:undefined,voucher:dc&&dc.voucher||undefined,
+   discount:dc&&!dc.voucher&&currentUser.role==='admin'?{amount:dc.amount,reason:dc.reason||'Admin discount'}:undefined,
+   discountRequest:(s.discountStatus==='Pending'&&s.pendingDiscount)?{amount:s.pendingDiscount.amount,reason:s.pendingDiscount.reason||''}:undefined},SY.when(s));});
+ ssSet('ss_rs',rs);
+ if(asRequest){SY.merging=true;try{persistSales();ssSet('ss_snap',SY.shape());}finally{SY.merging=false;}}
+ SY.kick();return {n:list.length,asRequest};};
+/* Runs once on each phone after the full re-pull: sends again whatever this phone made that the server does not have. */
+SY.recover=(p,lostPay)=>{try{const onServer=new Set((p.sales||[]).map(x=>x.SaleID)),haveCust=new Set((p.debtors||[]).map(x=>x.CustomerID)),pre=(window.SALE_PREFIX||'~')+'-',queued=new Set(syQ().map(o=>o.payload&&o.payload.saleId));
+ const lost=sales.filter(s=>String(s.id).startsWith(pre)&&!onServer.has(s.id)&&!queued.has(s.id)&&!s.refunded&&s.lines&&s.lines.length);
+ const r=SY.resend(lost,sid=>!haveCust.has(sid));let ex=0;
+ const pays=(lostPay||[]).filter(x=>x&&x.amount>0);pays.forEach(x=>SY.qAt('debtor.payment',{customerId:x.sid,amount:x.amount,paymentId:x.pid},SY.noon(x.date)));
+ if(p.expenses){const have=new Set(p.expenses.map(x=>x.ExpenseID));expenses.filter(e=>e.sid&&!have.has(e.sid)).forEach(e=>{SY.qAt('expense.add',{expenseId:e.sid,date:e.isoDate,category:e.category,amount:e.amount,notes:e.note||''},SY.noon(e.isoDate));ex++;});}
+ if(r.n||pays.length||ex){SY.kick();const bits=[];if(r.n)bits.push(r.n+' sale(s)'+(r.asRequest?' ('+r.asRequest+' with a discount that now waits for admin approval)':''));if(pays.length)bits.push(pays.length+' customer payment(s)');if(ex)bits.push(ex+' expense(s)');
+  setTimeout(()=>alert('These had not reached the server and are being sent now: '+bits.join(', ')+'.'),300);}
+ }catch(e){console.warn('Recover problem:',e);}};
+/* Automatic check, at most every 10 minutes after a sync: asks the server whether it has this phone's sales from the last 3 days, and sends again any it does not. */
+SY.verify=async()=>{if(SY.vbusy||!currentUser||!navigator.onLine||syQ().length)return;const now=Date.now();if(now-(+ssGet('ss_vt',0))<10*60*1000)return;SY.vbusy=true;
+ try{const pre=(window.SALE_PREFIX||'~')+'-',cut=new Date(now-3*86400000).toISOString().slice(0,10),mine=sales.filter(s=>String(s.id).startsWith(pre)&&String(s.isoDate)>=cut&&!s.refunded&&s.lines&&s.lines.length);
+  if(!mine.length){ssSet('ss_vt',now);return;}
+  const cids=[...new Set(mine.filter(s=>s.payment==='Credit').map(s=>(debtors.find(d=>String(d.name).toLowerCase()===String(s.customer||'').toLowerCase().trim())||{}).sid).filter(Boolean))];
+  const d=await SS.api('sales.verify',{token:currentUser.token,saleIds:mine.map(s=>s.id).slice(-300),customerIds:cids});ssSet('ss_vt',now);
+  const miss=new Set(d.missing||[]),mc=new Set(d.missingCustomers||[]);if(!miss.size||syQ().length)return;
+  const r=SY.resend(mine.filter(s=>miss.has(s.id)),sid=>mc.has(sid));
+  if(r.n)setTimeout(()=>alert(r.n+' sale(s) on this phone had not reached the server. They are being sent again.'),300);
+ }catch(e){console.warn('Check problem:',e);}finally{SY.vbusy=false;}};
 SY.wipeLocal=ep=>{SY.merging=true;try{items=[];sales=[];debtors=[];expenses=[];persistItems();persistSales();persistDebtors();persistExpenses();ssSet('ss_q',[]);ssSet('ss_failed',[]);ssSet('ss_ledger',[]);ssSet('ss_since',null);ssSet('ss_snap',null);ssSet('ss_epoch',String(ep));}finally{SY.merging=false;}populateCategoryFilters();renderAll();SY.chip();};
 SY.fetchPhotos=async()=>{if(settings.logoWant){const w=settings.logoWant;if(w==='none'){settings.logo=window.SS_LOGO;settings.logoHave='none';settings.logoWant=null;}
   else{try{const d=await SS.api('photo.get',{token:currentUser.token,itemIds:['LOGO']}),p=d.photos.LOGO;if(p){settings.logo=p.dataUrl;settings.logoHave=p.version;}settings.logoWant=null;}catch(e){}}
@@ -106,7 +154,7 @@ SY.mItems=(list,batches)=>{const by={};items.forEach(i=>{if(i.sid)by[i.sid]=i;})
   L.forEach(e=>{const take=Math.min(Math.max(e.qty,0),used);used-=take;e.qty-=take;});i.batches=L.filter(e=>e.qty>0);}else i.batches=i.trackBatches?[]:null;});
  items=items.filter(i=>!i.sid||seen.has(i.sid));};
 SY.mLedger=rows=>{const all=ssGet('ss_ledger',[]),have=new Set(all.map(r=>r.EntryID));rows.forEach(r=>{if(!have.has(r.EntryID))all.push(r);});ssSet('ss_ledger',all);const by={};all.forEach(r=>{(by[r.CustomerID]=by[r.CustomerID]||[]).push(r);});
- debtors.forEach(d=>{const L=by[d.sid];if(!L)return;d.history=L.filter(r=>r.Type!=='VOID').sort((a,b)=>a.Timestamp<b.Timestamp?-1:1).map(r=>({date:String(r.Timestamp).slice(0,10),type:r.Type==='SALE'?'sale':r.Type==='DISCOUNT'?'discount':'payment',amount:+r.Amount,saleId:r.LinkedSaleID||undefined}));});};
+ debtors.forEach(d=>{const L=by[d.sid];if(!L)return;d.history=L.filter(r=>r.Type!=='VOID').sort((a,b)=>a.Timestamp<b.Timestamp?-1:1).map(r=>({date:String(r.Timestamp).slice(0,10),type:r.Type==='SALE'?'sale':r.Type==='DISCOUNT'?'discount':'payment',amount:+r.Amount,saleId:r.LinkedSaleID||undefined,pid:r.Type==='PAYMENT'?r.EntryID:undefined}));});};
 SY.mSettings=s=>{const raw=s&&s.AppSettingsJSON;if(!raw||raw===SY.blob())return;let o;try{o=JSON.parse(raw);}catch(e){return;}
  const keep=settings.logo;Object.assign(settings,o.s);if(!o.s.logo)settings.logo=keep||window.SS_LOGO;if(Array.isArray(o.branches)&&o.branches.length)branches=o.branches;
  if(!('receiptTpl' in o.s))delete settings.receiptTpl;   // switching back to the standard receipt must reach every phone
